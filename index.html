@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Laser Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            font-family: Arial, sans-serif;
+        }
+        
+        #canvas {
+            display: block;
+        }
+        
+        #settings {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #444;
+            max-height: 90vh;
+            overflow-y: auto;
+            font-family: 'Arial', sans-serif;
+            width: 300px;
+        }
+        
+        #settings.hidden {
+            display: none;
+        }
+        
+        button, input {
+            margin: 5px;
+            padding: 5px;
+        }
+        
+        .preset-controls {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #444;
+        }
+        
+        .preset-controls select,
+        .preset-controls input[type="text"] {
+            width: 150px;
+            margin-bottom: 5px;
+        }
+        
+        #horizontalControls {
+            display: none;
+        }
+        
+        #horizontalControls.visible {
+            display: block;
+        }
+        
+        #cycleControls {
+            display: none;
+        }
+        
+        #cycleControls.visible {
+            display: block;
+        }
+        
+        .settings-section {
+            border-bottom: 1px solid #444;
+            padding: 10px 0;
+            margin-bottom: 10px;
+        }
+        
+        .settings-section h4 {
+            margin: 0 0 10px 0;
+            color: #888;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        
+        .control-group {
+            margin-bottom: 8px;
+        }
+        
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+        
+        select {
+            width: 100%;
+            padding: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="settings">
+        <div class="settings-section">
+            <h4>Main Controls</h4>
+            <button id="startAudio">Start Audio</button>
+            <button id="fullscreenBtn">Fullscreen</button>
+            <button id="randomizeBtn">Randomize!</button>
+        </div>
+
+        <div class="settings-section">
+            <h4>Pattern</h4>
+            <select id="patternMode">
+                <option value="radial">Radial</option>
+                <option value="horizontal">Horizontal</option>
+            </select>
+        </div>
+
+        <div class="settings-section">
+            <h4>Line Settings</h4>
+            <label>Line Count:
+                <input type="range" id="lineCount" min="1" max="20" value="8">
+            </label>
+            <label>Line Thickness:
+                <input type="range" id="lineThickness" min="1" max="10" value="2">
+            </label>
+            <label>Sensitivity:
+                <input type="range" id="sensitivity" min="1" max="100" value="50">
+            </label>
+        </div>
+
+        <div class="settings-section">
+            <h4>Color</h4>
+            <div class="control-group">
+                <label>Color Mode:
+                    <select id="colorMode">
+                        <option value="static">Static</option>
+                        <option value="cycle">Color Cycle</option>
+                    </select>
+                </label>
+            </div>
+            <div class="control-group">
+                <label>Line Color:
+                    <input type="color" id="colorPicker" value="#ff0000">
+                </label>
+            </div>
+            <div id="cycleControls">
+                <label>Cycle Speed:
+                    <input type="range" id="colorCycleSpeed" min="0.1" max="10" step="0.1" value="2">
+                </label>
+                <label>Saturation:
+                    <input type="range" id="colorSaturation" min="0" max="100" value="100">
+                </label>
+                <label>Lightness:
+                    <input type="range" id="colorLightness" min="0" max="100" value="50">
+                </label>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h4>Beat Detection</h4>
+            <label>Bass Frequency:
+                <input type="range" id="bassFrequency" min="20" max="400" value="150">
+            </label>
+            <label>Bass Quality (Q):
+                <input type="range" id="bassQuality" min="0.1" max="5" step="0.1" value="1">
+            </label>
+            <label>Beat Sensitivity:
+                <input type="range" id="beatSensitivity" min="0.1" max="0.5" step="0.05" value="0.3">
+            </label>
+            <label>Beat Intensity:
+                <input type="range" id="beatIntensity" min="1" max="3" step="0.1" value="1.5">
+            </label>
+            <label>Beat Decay:
+                <input type="range" id="beatDecay" min="0.9" max="0.99" step="0.01" value="0.98">
+            </label>
+        </div>
+
+        <div class="settings-section">
+            <h4>Visual Effects</h4>
+            <label class="checkbox-label">
+                <input type="checkbox" id="glowEffect" checked>
+                Enable Glow
+            </label>
+            <label>Glow Intensity:
+                <input type="range" id="glowIntensity" min="5" max="50" value="20">
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="particlesEffect" checked>
+                Enable Particles
+            </label>
+            <label>Particle Size:
+                <input type="range" id="particleSize" min="1" max="10" value="3">
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="wavesEffect" checked>
+                Enable Waves
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="frequencyBars">
+                Enable Frequency Bars
+            </label>
+        </div>
+
+        <div id="horizontalControls" class="settings-section">
+            <h4>Horizontal Pattern Settings</h4>
+            <label>Number of Lines:
+                <input type="range" id="horizontalLineCount" min="1" max="10" value="3">
+            </label>
+            <label>Line Spacing:
+                <input type="range" id="horizontalLineSpacing" min="20" max="200" value="100">
+            </label>
+            <label>Wave Amplitude:
+                <input type="range" id="waveAmplitude" min="0" max="200" value="50">
+            </label>
+            <label>Wave Speed:
+                <input type="range" id="waveSpeed" min="0" max="10" value="2" step="0.1">
+            </label>
+            <label>Vertical Movement:
+                <select id="verticalMovement">
+                    <option value="none">None</option>
+                    <option value="updown">Up & Down</option>
+                </select>
+            </label>
+            <label>Vertical Speed:
+                <input type="range" id="verticalSpeed" min="0.1" max="5" step="0.1" value="1">
+            </label>
+            <label>Vertical Range:
+                <input type="range" id="verticalRange" min="10" max="400" value="200">
+            </label>
+        </div>
+
+        <div class="settings-section">
+            <h4>Presets</h4>
+            <select id="presetSelect">
+                <option value="default">Default</option>
+                <option value="minimal">Minimal</option>
+                <option value="maximal">Maximal</option>
+                <option value="neon">Neon Pulse</option>
+                <option value="matrix">Matrix</option>
+                <option value="sunset">Sunset Waves</option>
+                <option value="ocean">Ocean Deep</option>
+                <option value="fire">Fire Dance</option>
+                <option value="rainbow">Rainbow Flow</option>
+                <option value="cosmic">Cosmic Rays</option>
+                <option value="retro">Retro Wave</option>
+                <option value="zen">Zen Garden</option>
+            </select>
+            <button id="loadPreset">Load Preset</button>
+            <br>
+            <input type="text" id="newPresetName" placeholder="New preset name">
+            <button id="savePreset">Save Current as Preset</button>
+        </div>
+
+        <div class="settings-section">
+            <button id="toggleSettings">Hide Settings</button>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html> 
