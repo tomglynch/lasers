@@ -1,8 +1,8 @@
 class AudioVisualizer {
     constructor() {
         // Clear any existing settings
-        localStorage.clear();
-        console.log('Cleared localStorage');
+        // localStorage.clear();
+        // console.log('Cleared localStorage');
 
         this.canvas = document.getElementById('canvas');
         this.ctx = this.canvas.getContext('2d');
@@ -46,8 +46,6 @@ class AudioVisualizer {
             sensitivity: 50,
             lineCount: 8,
             lineThickness: 2,
-            glowEnabled: false,
-            glowIntensity: 20,  // New: control glow strength
             
             // Effects
             particlesEnabled: true,
@@ -87,8 +85,6 @@ class AudioVisualizer {
                 sensitivity: 50,
                 lineCount: 8,
                 lineThickness: 2,
-                glowEnabled: true,
-                glowIntensity: 20,
                 particlesEnabled: true,
                 particleCount: 50,
                 particleSize: 3,
@@ -116,8 +112,6 @@ class AudioVisualizer {
                 sensitivity: 30,
                 lineCount: 4,
                 lineThickness: 1,
-                glowEnabled: false,
-                glowIntensity: 10,
                 particlesEnabled: false,
                 particleCount: 0,
                 particleSize: 2,
@@ -145,8 +139,6 @@ class AudioVisualizer {
                 sensitivity: 70,
                 lineCount: 16,
                 lineThickness: 3,
-                glowEnabled: true,
-                glowIntensity: 30,
                 particlesEnabled: true,
                 particleCount: 100,
                 particleSize: 5,
@@ -233,13 +225,6 @@ class AudioVisualizer {
         
         document.getElementById('toggleSettings').addEventListener('click', () => {
             document.getElementById('settings').classList.toggle('hidden');
-        });
-        
-        document.getElementById('glowEffect').addEventListener('change', (e) => {
-            const oldValue = this.settings.glowEnabled;
-            this.settings.glowEnabled = e.target.checked;
-            this.logSettingChange('glowEnabled', oldValue, this.settings.glowEnabled);
-            this.saveSettings();
         });
         
         document.getElementById('particlesEffect').addEventListener('change', (e) => {
@@ -379,13 +364,6 @@ class AudioVisualizer {
         
         document.getElementById('verticalRange').addEventListener('input', (e) => {
             this.settings.verticalRange = parseInt(e.target.value);
-            this.saveSettings();
-        });
-
-        document.getElementById('glowIntensity').addEventListener('input', (e) => {
-            const oldValue = this.settings.glowIntensity;
-            this.settings.glowIntensity = parseInt(e.target.value);
-            this.logSettingChange('glowIntensity', oldValue, this.settings.glowIntensity);
             this.saveSettings();
         });
 
@@ -684,14 +662,6 @@ class AudioVisualizer {
         this.ctx.strokeStyle = this.settings.color;
         this.ctx.lineWidth = this.settings.lineThickness;
         
-        // Apply glow if enabled
-        if (this.settings.glowEnabled) {
-            this.ctx.shadowBlur = this.settings.glowIntensity;
-            this.ctx.shadowColor = this.settings.color;
-        } else {
-            this.ctx.shadowBlur = 0;
-        }
-        
         // Time-based offset for wave movement
         const timeOffset = performance.now() / 1000;
         const waveOffset = timeOffset * this.settings.waveSpeed;
@@ -808,7 +778,6 @@ class AudioVisualizer {
         document.getElementById('sensitivity').value = this.settings.sensitivity;
         document.getElementById('lineCount').value = this.settings.lineCount;
         document.getElementById('beatSensitivity').value = this.settings.beatSensitivity;
-        document.getElementById('glowEffect').checked = this.settings.glowEnabled;
         document.getElementById('particlesEffect').checked = this.settings.particlesEnabled;
         document.getElementById('particleSize').value = this.settings.particleSize;
         document.getElementById('wavesEffect').checked = this.settings.wavesEnabled;
@@ -826,7 +795,6 @@ class AudioVisualizer {
         document.getElementById('verticalMovement').value = this.settings.verticalMovement;
         document.getElementById('verticalSpeed').value = this.settings.verticalSpeed;
         document.getElementById('verticalRange').value = this.settings.verticalRange;
-        document.getElementById('glowIntensity').value = this.settings.glowIntensity;
         document.getElementById('bassFrequency').value = this.settings.bassFrequency;
         document.getElementById('bassQuality').value = this.settings.bassQuality;
 
@@ -873,8 +841,6 @@ class AudioVisualizer {
             color: this.settings.color,
             lineCount: this.settings.lineCount,
             horizontalLineCount: this.settings.horizontalLineCount,
-            glowEnabled: this.settings.glowEnabled,
-            glowIntensity: this.settings.glowIntensity
         });
     }
 
@@ -882,16 +848,10 @@ class AudioVisualizer {
     updateVisualizationSettings() {
         if (this.ctx) {
             this.ctx.lineWidth = this.settings.lineThickness;
-            // Explicitly set shadow properties based on glow state
-            if (this.settings.glowEnabled) {
-                this.ctx.shadowBlur = this.settings.glowIntensity;
-                this.ctx.shadowColor = this.settings.color;
-            } else {
-                this.ctx.shadowBlur = 0;
-                this.ctx.shadowColor = 'transparent';
-            }
+            // Always ensure glow is off
+            this.ctx.shadowBlur = 0;
+            this.ctx.shadowColor = 'transparent';
         }
-        // Only log significant changes
     }
 
     // Add this method to the AudioVisualizer class
@@ -905,6 +865,23 @@ class AudioVisualizer {
         // Helper function to random bool with probability
         const randomBool = (probability = 0.5) => Math.random() < probability;
 
+        // Helper function to convert HSL to Hex
+        const hslToHex = (h, s, l) => {
+            l /= 100;
+            const a = s * Math.min(l, 1 - l) / 100;
+            const f = n => {
+                const k = (n + h / 30) % 12;
+                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                return Math.round(255 * color).toString(16).padStart(2, '0');
+            };
+            return `#${f(0)}${f(8)}${f(4)}`;
+        };
+
+        // Generate random HSL values
+        const hue = random(0, 360);
+        const saturation = random(70, 100);
+        const lightness = random(40, 60);
+
         // Randomize settings
         this.settings = {
             ...this.settings,
@@ -913,10 +890,12 @@ class AudioVisualizer {
             
             // Colors
             colorMode: randomBool() ? 'static' : 'cycle',
-            colorHue: random(0, 360),
-            colorSaturation: random(70, 100),
-            colorLightness: random(40, 60),
+            colorHue: hue,
+            colorSaturation: saturation,
+            colorLightness: lightness,
             colorCycleSpeed: random(0.5, 5, true),
+            // Set the color in hex format for the color picker
+            color: hslToHex(hue, saturation, lightness),
             
             // Lines
             lineCount: random(3, 16),
@@ -924,8 +903,6 @@ class AudioVisualizer {
             sensitivity: random(30, 70),
             
             // Effects
-            glowEnabled: randomBool(0.7),
-            glowIntensity: random(10, 40),
             particlesEnabled: randomBool(0.6),
             particleSize: random(2, 6),
             wavesEnabled: randomBool(0.6),
@@ -946,14 +923,9 @@ class AudioVisualizer {
             verticalRange: random(100, 300),
             
             // Add bass filter settings
-            bassFrequency: random(100, 200),  // Random frequency between 100 and 200 Hz
-            bassQuality: random(0.5, 2),      // Random Q value between 0.5 and 2
+            bassFrequency: random(100, 200),
+            bassQuality: random(0.5, 2)
         };
-
-        // Set color based on mode
-        if (this.settings.colorMode === 'static') {
-            this.settings.color = `hsl(${this.settings.colorHue}, ${this.settings.colorSaturation}%, ${this.settings.colorLightness}%)`;
-        }
 
         // Update UI to reflect new settings
         this.updateUIFromSettings();
@@ -964,11 +936,6 @@ class AudioVisualizer {
 }
 
 // Change the initialization at the bottom of the file from:
-window.addEventListener('load', () => {
-    new AudioVisualizer();
-});
-
-// To:
 window.addEventListener('DOMContentLoaded', () => {
     // First verify all elements exist
     const requiredElements = [
@@ -979,7 +946,6 @@ window.addEventListener('DOMContentLoaded', () => {
         'sensitivity',
         'lineCount',
         'toggleSettings',
-        'glowEffect',
         'particlesEffect',
         'particleSize',
         'wavesEffect',
@@ -1015,6 +981,8 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // If all elements exist, initialize the visualizer
-    new AudioVisualizer();
+    // If all elements exist, initialize the visualizer and auto-start audio
+    const visualizer = new AudioVisualizer();
+    // Auto-start audio after a small delay to ensure everything is initialized
+    setTimeout(() => visualizer.startAudio(), 100);
 }); 
