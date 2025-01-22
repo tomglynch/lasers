@@ -1,6 +1,6 @@
-const express = require('express');
-const livereload = require('livereload');
-const connectLivereload = require('connect-livereload');
+import express from 'express';
+import livereload from 'livereload';
+import connectLivereload from 'connect-livereload';
 
 const app = express();
 const port = 8000;
@@ -14,13 +14,19 @@ const liveReloadServer = livereload.createServer({
 });
 
 // Watch all files in the current directory
-liveReloadServer.watch(__dirname);
+liveReloadServer.watch(process.cwd());
 
 // Add livereload middleware to express BEFORE static middleware
 app.use(connectLivereload());
 
-// Serve static files
-app.use(express.static('./'));
+// Serve static files with correct MIME types
+app.use(express.static('./', {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+        }
+    }
+}));
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);

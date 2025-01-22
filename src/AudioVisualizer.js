@@ -1,4 +1,23 @@
-import { ColorUtils } from './utils/ColorUtils';
+/**
+ * Main AudioVisualizer class
+ */
+
+import { initializeAudio, detectBeat, setupAudioInput } from './utils/AudioUtils.js';
+import { updateCycleColor } from './utils/ColorUtils.js';
+import { drawRadialLines } from './patterns/RadialPattern.js';
+import { drawHorizontalLines } from './patterns/HorizontalPattern.js';
+import { createParticles, updateParticles } from './effects/ParticleEffect.js';
+import { createWave, updateWaves } from './effects/WaveEffect.js';
+import { drawFrequencyBars } from './effects/FrequencyBars.js';
+import {
+    defaultSettings,
+    loadSettings,
+    saveSettings,
+    loadPreset,
+    savePreset,
+    randomizeSettings,
+    presets
+} from './Settings.js';
 
 export class AudioVisualizer {
     constructor() {
@@ -10,136 +29,35 @@ export class AudioVisualizer {
         this.isPlaying = false;
         this.lines = [];
         
-        // Add new properties for beat detection
+        // Beat detection data
         this.beatDetectionData = {
-            threshold: 0.12,
-            decay: 0.97,
-            peaks: [],
             energy: {
                 current: 0,
-                previous: 0
+                previous: 0,
+                history: new Array(8).fill(0.1)
             },
-            beatCutoff: 0,
-            beatTime: 0,
-            energyHistory: new Array(8).fill(0)
+            threshold: 0.3,
+            lastBeatTime: 0
         };
         
-        // Add new properties for visual effects
+        // Visual effects state
         this.particles = [];
         this.waves = [];
         
-        // Expand settings
-        this.settings = {
-            // Core settings
-            patternMode: 'radial',
-            color: '#ff0000',
-            colorMode: 'static',
-            
-            // Beat detection
-            beatSensitivity: 0.12,
-            beatIntensity: 2.2,
-            beatDecay: 0.97,
-            
-            // Visual settings
-            sensitivity: 50,
-            lineCount: 8,
-            lineThickness: 2,
-            
-            // Effects
-            particlesEnabled: true,
-            particleCount: 50,
-            particleSize: 3,
-            wavesEnabled: true,
-            frequencyBarsEnabled: false,
-            
-            // Color cycling
-            colorCycleSpeed: 2,
-            colorHue: 0,
-            colorSaturation: 100,
-            colorLightness: 50,
-            
-            // Horizontal pattern specific
-            horizontalLineCount: 3,
-            horizontalLineSpacing: 100,
-            waveAmplitude: 50,
-            waveSpeed: 2,
-            verticalMovement: 'none',
-            verticalSpeed: 1,
-            verticalRange: 200,
-            
-            // Add bass filter settings
-            bassFrequency: 150,
-            bassQuality: 1,
-        };
-        
-        this.presets = {
-            default: {
-                patternMode: 'radial',
-                color: '#ff0000',
-                colorMode: 'static',
-                beatSensitivity: 0.3,
-                beatIntensity: 1.5,
-                beatDecay: 0.98,
-                sensitivity: 50,
-                lineCount: 8,
-                lineThickness: 2,
-                particlesEnabled: true,
-                particleCount: 50,
-                particleSize: 3,
-                wavesEnabled: true,
-                frequencyBarsEnabled: false,
-                colorCycleSpeed: 2,
-                colorHue: 0,
-                colorSaturation: 100,
-                colorLightness: 50,
-                horizontalLineCount: 3,
-                horizontalLineSpacing: 100,
-                waveAmplitude: 50,
-                waveSpeed: 2,
-                verticalMovement: 'none',
-                verticalSpeed: 1,
-                verticalRange: 200
-            },
-            minimal: {
-                patternMode: 'horizontal',
-                color: '#00ff00',
-                colorMode: 'static',
-                beatSensitivity: 0.2,
-                beatIntensity: 1.2,
-                beatDecay: 0.95,
-                sensitivity: 30,
-                lineCount: 4,
-                lineThickness: 1,
-                particlesEnabled: false,
-                particleCount: 0,
-                particleSize: 2,
-                wavesEnabled: false,
-                frequencyBarsEnabled: false,
-                colorCycleSpeed: 1,
-                colorHue: 120,
-                colorSaturation: 100,
-                colorLightness: 50,
-                horizontalLineCount: 3,
-                horizontalLineSpacing: 100,
-                waveAmplitude: 30,
-                waveSpeed: 1,
-                verticalMovement: 'none',
-                verticalSpeed: 1,
-                verticalRange: 100
-            }
-        };
-        
-        // Load saved settings if they exist
-        this.loadSavedSettings();
+        // Load settings
+        this.settings = loadSettings();
         
         this.setupCanvas();
         this.setupEventListeners();
-        
-        // Update UI with loaded settings
         this.updateUIFromSettings();
         
-        this.audioStream = null;  // Store the audio stream
-        this.lastPatternMode = null;  // Track pattern changes
+        // Populate preset list
+        this.populatePresetList();
+        
+        this.audioStream = null;
+
+        // Define saveHandler as a class property
+        this.saveHandler = () => this.saveNewPreset();
     }
     
     setupCanvas() {
@@ -152,87 +70,24 @@ export class AudioVisualizer {
         this.canvas.height = window.innerHeight;
     }
     
-    setupEventListeners() {
-        // Audio start
-        document.getElementById('startAudio')?.addEventListener('click', () => {
-            this.startAudio();
-        });
-        
-        // Fullscreen
-        document.getElementById('fullscreenBtn')?.addEventListener('click', () => this.toggleFullscreen());
-        
-        // Settings controls
-        document.getElementById('colorPicker')?.addEventListener('input', (e) => {
-            this.settings.color = e.target.value;
-            this.saveSettings();
-        });
-        
-        document.getElementById('sensitivity')?.addEventListener('input', (e) => {
-            this.settings.sensitivity = parseInt(e.target.value);
-            this.saveSettings();
-        });
-        
-        document.getElementById('lineCount')?.addEventListener('input', (e) => {
-            this.settings.lineCount = parseInt(e.target.value);
-            this.saveSettings();
-        });
-    }
-    
     async startAudio() {
         try {
-            // Check if we already have a stream
-            if (this.audioStream) {
-                this.setupAudioContext(this.audioStream);
-                return;
+            if (!this.audioStream) {
+                this.audioStream = await setupAudioInput();
             }
-
-            // Check if we have permission
-            const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
             
-            if (permissionStatus.state === 'granted') {
-                // We have permission, get the stream
-                this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                this.setupAudioContext(this.audioStream);
-            } else if (permissionStatus.state === 'prompt') {
-                // Need to request permission
-                this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                this.setupAudioContext(this.audioStream);
-            } else {
-                // Permission denied
-                console.error('Microphone access denied');
-                alert('This app requires microphone access to work.');
-            }
+            const audio = await initializeAudio(this.audioStream, this.settings);
+            this.audioContext = audio.context;
+            this.analyser = audio.analyser;
+            this.dataArray = audio.dataArray;
+            
+            this.isPlaying = true;
+            this.animate();
+            
         } catch (err) {
-            console.error('Error accessing microphone:', err);
+            console.error('Error starting audio:', err);
             alert('Error accessing microphone. Please ensure you have a microphone connected and have granted permission to use it.');
         }
-    }
-    
-    setupAudioContext(stream) {
-        if (this.audioContext) {
-            this.audioContext.close();
-        }
-        
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = this.audioContext.createMediaStreamSource(stream);
-        
-        // Create a low-pass filter for bass frequencies
-        const bassFilter = this.audioContext.createBiquadFilter();
-        bassFilter.type = 'lowpass';
-        bassFilter.frequency.value = this.settings.bassFrequency;
-        bassFilter.Q.value = this.settings.bassQuality;
-        
-        this.analyser = this.audioContext.createAnalyser();
-        this.analyser.fftSize = 2048;
-        this.analyser.smoothingTimeConstant = 0.5;
-        
-        // Connect the audio nodes
-        source.connect(bassFilter);
-        bassFilter.connect(this.analyser);
-        
-        this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-        this.isPlaying = true;
-        this.animate();
     }
     
     toggleFullscreen() {
@@ -243,44 +98,16 @@ export class AudioVisualizer {
         }
     }
     
-    drawLines(beat) {
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        
-        this.ctx.strokeStyle = this.settings.color;
-        this.updateVisualizationSettings();
-        
-        this.ctx.lineWidth = this.settings.lineThickness;
-        
-        for (let i = 0; i < this.settings.lineCount; i++) {
-            const angle = (i / this.settings.lineCount) * Math.PI * 2;
-            const intensity = this.dataArray[i * 2] / 255;
-            
-            let length = intensity * (this.canvas.height / 2) * (this.settings.sensitivity / 50);
-            if (beat) {
-                length *= this.settings.beatIntensity;
-            }
-            
-            const endX = centerX + Math.cos(angle) * length;
-            const endY = centerY + Math.sin(angle) * length;
-            
-            this.ctx.beginPath();
-            this.ctx.moveTo(centerX, centerY);
-            this.ctx.lineTo(endX, endY);
-            this.ctx.stroke();
-        }
-    }
-    
     animate = () => {
         if (!this.isPlaying) return;
         
         // Get audio data
         this.analyser.getByteFrequencyData(this.dataArray);
-        const beat = this.detectBeat(this.dataArray);
+        const beat = detectBeat(this.dataArray, this.beatDetectionData, this.settings);
         
         // Update color if needed
         if (this.settings.colorMode === 'cycle') {
-            this.updateColor();
+            this.settings.color = updateCycleColor(this.settings);
         }
         
         // Clear canvas with fade effect
@@ -288,270 +115,230 @@ export class AudioVisualizer {
         this.ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
+        const dimensions = {
+            width: this.canvas.width,
+            height: this.canvas.height
+        };
+        
         // Draw based on pattern mode
         if (this.settings.patternMode === 'horizontal') {
-            this.drawHorizontalLines(beat);
+            drawHorizontalLines(this.ctx, dimensions, this.dataArray, this.settings, beat);
         } else {
-            this.drawLines(beat);
+            drawRadialLines(this.ctx, dimensions, this.dataArray, this.settings, beat);
         }
         
         // Draw additional effects
-        if (this.settings.wavesEnabled) this.updateWaves(beat);
-        if (this.settings.particlesEnabled) this.updateParticles(beat);
-        if (this.settings.frequencyBarsEnabled) this.drawFrequencyBars();
+        if (this.settings.wavesEnabled) {
+            if (beat) this.waves.push(createWave());
+            this.waves = updateWaves(this.ctx, this.waves, dimensions, this.settings);
+        }
+        
+        if (this.settings.particlesEnabled) {
+            if (beat) this.particles.push(...createParticles(dimensions, this.settings));
+            this.particles = updateParticles(this.ctx, this.particles, this.settings);
+        }
+        
+        if (this.settings.frequencyBarsEnabled) {
+            drawFrequencyBars(this.ctx, dimensions, this.dataArray, this.settings);
+        }
         
         requestAnimationFrame(this.animate);
     }
 
-    detectBeat(data) {
-        // Focus on sub-bass and bass frequencies (20Hz - 150Hz)
-        // With fftSize of 2048, each bin represents ~21.5Hz
-        // So we'll look at bins 1-7 for sub-bass (20-150Hz)
-        const subBassEnd = Math.floor(7 * (this.analyser.fftSize / 2048));
-        
-        // Calculate sub-bass energy
-        let subBassSum = 0;
-        for (let i = 1; i < subBassEnd; i++) {
-            subBassSum += data[i];
+    setupEventListeners() {
+        // Start audio button
+        const startAudioBtn = document.getElementById('startAudio');
+        if (startAudioBtn) {
+            startAudioBtn.addEventListener('click', () => this.startAudio());
         }
-        
-        const instant = subBassSum / subBassEnd;
-        const energy = instant / 255;  // Normalize to 0-1
-        
-        this.beatDetectionData.energy.previous = this.beatDetectionData.energy.current;
-        this.beatDetectionData.energy.current = energy;
-        
-        const delta = energy - this.beatDetectionData.energy.previous;
-        
-        // Dynamic threshold based on recent energy levels
-        if (!this.beatDetectionData.energyHistory) {
-            this.beatDetectionData.energyHistory = new Array(8).fill(0);
-        }
-        
-        // Update energy history
-        this.beatDetectionData.energyHistory.push(energy);
-        this.beatDetectionData.energyHistory.shift();
-        
-        // Calculate dynamic threshold
-        const avgEnergy = this.beatDetectionData.energyHistory.reduce((a, b) => a + b) / 8;
-        const dynamicThreshold = avgEnergy * 1.2;  // 20% above average
-        
-        // Beat detection with dynamic threshold
-        if (energy > dynamicThreshold && delta > 0.02) {  // Require significant increase
-            if (Date.now() - this.beatDetectionData.beatTime > 100) {  // Minimum 100ms between beats
-                this.beatDetectionData.beatTime = Date.now();
-                this.beatDetectionData.beatCutoff = energy * 1.2;
-                return true;
-            }
-        }
-        
-        this.beatDetectionData.beatCutoff *= this.beatDetectionData.decay;
-        this.beatDetectionData.beatCutoff = Math.max(this.beatDetectionData.threshold, this.beatDetectionData.beatCutoff);
-        
-        return false;
-    }
 
-    drawHorizontalLines(beat) {
-        const centerY = this.canvas.height / 2;
-        this.ctx.strokeStyle = this.settings.color;
-        this.ctx.lineWidth = this.settings.lineThickness;
-        
-        // Time-based offset for wave movement
-        const timeOffset = performance.now() / 1000;
-        const waveOffset = timeOffset * this.settings.waveSpeed;
-        
-        // Calculate vertical offset for up/down movement
-        let verticalOffset = 0;
-        if (this.settings.verticalMovement === 'updown') {
-            verticalOffset = Math.sin(timeOffset * this.settings.verticalSpeed) * this.settings.verticalRange;
-        }
-        
-        // Draw each horizontal line
-        for (let i = 0; i < this.settings.horizontalLineCount; i++) {
-            const baseY = centerY + 
-                         (i - (this.settings.horizontalLineCount - 1) / 2) * this.settings.horizontalLineSpacing + 
-                         verticalOffset;
-            
-            this.ctx.beginPath();
-            
-            // Draw the wavy line
-            for (let x = 0; x < this.canvas.width; x += 2) {
-                const freqIndex = Math.floor((x / this.canvas.width) * 32);
-                const frequency = this.dataArray[freqIndex] / 255.0;
-                
-                // Apply beat effect to wave amplitude
-                let currentAmplitude = this.settings.waveAmplitude;
-                if (beat) {
-                    currentAmplitude *= this.settings.beatIntensity;
-                }
-                
-                const wave = Math.sin(x / 50 + waveOffset + i * Math.PI) * currentAmplitude;
-                const y = baseY + wave * frequency * (this.settings.sensitivity / 50);
-                
-                if (x === 0) {
-                    this.ctx.moveTo(x, y);
+        // Fullscreen button
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
                 } else {
-                    this.ctx.lineTo(x, y);
+                    document.exitFullscreen();
                 }
-            }
-            
-            this.ctx.stroke();
-        }
-    }
-
-    updateParticles(beat) {
-        if (!this.settings.particlesEnabled) return;
-        
-        // Create new particles on beats
-        if (beat) {
-            for (let i = 0; i < 5; i++) {
-                this.particles.push({
-                    x: this.canvas.width / 2,
-                    y: this.canvas.height / 2,
-                    angle: Math.random() * Math.PI * 2,
-                    speed: 2 + Math.random() * 4,
-                    size: this.settings.particleSize,
-                    life: 1.0
-                });
-            }
-        }
-
-        // Update and draw particles
-        this.particles = this.particles.filter(particle => {
-            particle.x += Math.cos(particle.angle) * particle.speed;
-            particle.y += Math.sin(particle.angle) * particle.speed;
-            particle.life -= 0.02;
-
-            if (particle.life > 0) {
-                this.ctx.beginPath();
-                this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-                this.ctx.fillStyle = ColorUtils.colorWithOpacity(this.settings.color, particle.life);
-                this.ctx.fill();
-                return true;
-            }
-            return false;
-        });
-    }
-
-    updateWaves(beat) {
-        if (!this.settings.wavesEnabled) return;
-        
-        if (beat) {
-            this.waves.push({
-                radius: 0,
-                opacity: 1.0
             });
         }
 
-        this.waves = this.waves.filter(wave => {
-            wave.radius += 5;
-            wave.opacity -= 0.02;
-
-            if (wave.opacity > 0) {
-                this.ctx.beginPath();
-                this.ctx.arc(this.canvas.width / 2, this.canvas.height / 2, wave.radius, 0, Math.PI * 2);
-                this.ctx.lineWidth = this.settings.lineThickness;
-                this.ctx.strokeStyle = ColorUtils.colorWithOpacity(this.settings.color, wave.opacity);
-                this.ctx.stroke();
-                return true;
-            }
-            return false;
-        });
-    }
-
-    drawFrequencyBars() {
-        if (!this.settings.frequencyBarsEnabled) return;
-        
-        const barWidth = this.canvas.width / 64;
-        const barSpacing = 2;
-        const maxHeight = this.canvas.height / 3;
-
-        for (let i = 0; i < 64; i++) {
-            const height = (this.dataArray[i] / 255) * maxHeight;
-            const x = i * (barWidth + barSpacing);
-            const y = this.canvas.height - height;
-
-            this.ctx.fillStyle = this.settings.color;
-            this.ctx.fillRect(x, y, barWidth, height);
+        // Settings toggle
+        const toggleSettings = document.getElementById('toggleSettings');
+        if (toggleSettings) {
+            toggleSettings.addEventListener('click', () => {
+                const settingsPanel = document.getElementById('settingsPanel');
+                if (settingsPanel) {
+                    settingsPanel.classList.toggle('visible');
+                }
+            });
         }
-    }
 
-    updateColor() {
-        if (this.settings.colorMode === 'cycle') {
-            this.settings.colorHue = (this.settings.colorHue + this.settings.colorCycleSpeed * 0.1) % 360;
-            this.settings.color = ColorUtils.hslToHex(
-                this.settings.colorHue,
-                this.settings.colorSaturation,
-                this.settings.colorLightness
-            );
-            // Update the color picker to reflect the current color
-            const colorPicker = document.getElementById('colorPicker');
-            if (colorPicker) {
-                colorPicker.value = this.settings.color;
-            }
+        // Color picker
+        const colorPicker = document.getElementById('colorPicker');
+        if (colorPicker) {
+            colorPicker.addEventListener('input', (e) => {
+                this.settings.color = e.target.value;
+                this.saveSettings();
+            });
         }
-    }
 
-    saveSettings() {
-        localStorage.setItem('audioVisualizerSettings', JSON.stringify(this.settings));
-        localStorage.setItem('audioVisualizerPresets', JSON.stringify(this.presets));
-    }
-
-    loadSavedSettings() {
-        const savedSettings = localStorage.getItem('audioVisualizerSettings');
-        const savedPresets = localStorage.getItem('audioVisualizerPresets');
-        
-        if (savedSettings) {
-            this.settings = {...this.settings, ...JSON.parse(savedSettings)};
+        // Sensitivity slider
+        const sensitivity = document.getElementById('sensitivity');
+        if (sensitivity) {
+            sensitivity.addEventListener('input', (e) => {
+                this.settings.sensitivity = parseInt(e.target.value);
+                this.saveSettings();
+            });
         }
-        
-        if (savedPresets) {
-            const loadedPresets = JSON.parse(savedPresets);
-            // Merge with default presets, allowing custom presets to override defaults
-            this.presets = {...this.presets, ...loadedPresets};
+
+        // Line count slider
+        const lineCount = document.getElementById('lineCount');
+        if (lineCount) {
+            lineCount.addEventListener('input', (e) => {
+                this.settings.lineCount = parseInt(e.target.value);
+                this.saveSettings();
+            });
+        }
+
+        // Beat sensitivity slider
+        const beatSensitivity = document.getElementById('beatSensitivity');
+        if (beatSensitivity) {
+            beatSensitivity.addEventListener('input', (e) => {
+                this.settings.beatSensitivity = parseFloat(e.target.value);
+                this.saveSettings();
+            });
+        }
+
+        // Pattern mode select
+        const patternMode = document.getElementById('patternMode');
+        if (patternMode) {
+            patternMode.addEventListener('change', (e) => {
+                this.settings.patternMode = e.target.value;
+                this.updateUIFromSettings();
+                this.saveSettings();
+            });
+        }
+
+        // Color mode select
+        const colorMode = document.getElementById('colorMode');
+        if (colorMode) {
+            colorMode.addEventListener('change', (e) => {
+                this.settings.colorMode = e.target.value;
+                this.updateUIFromSettings();
+                this.saveSettings();
+            });
+        }
+
+        // Color cycle speed slider
+        const colorCycleSpeed = document.getElementById('colorCycleSpeed');
+        if (colorCycleSpeed) {
+            colorCycleSpeed.addEventListener('input', (e) => {
+                this.settings.colorCycleSpeed = parseInt(e.target.value);
+                this.saveSettings();
+            });
+        }
+
+        // Horizontal line count slider
+        const horizontalLineCount = document.getElementById('horizontalLineCount');
+        if (horizontalLineCount) {
+            horizontalLineCount.addEventListener('input', (e) => {
+                this.settings.horizontalLineCount = parseInt(e.target.value);
+                this.saveSettings();
+            });
+        }
+
+        // Horizontal line spacing slider
+        const horizontalLineSpacing = document.getElementById('horizontalLineSpacing');
+        if (horizontalLineSpacing) {
+            horizontalLineSpacing.addEventListener('input', (e) => {
+                this.settings.horizontalLineSpacing = parseInt(e.target.value);
+                this.saveSettings();
+            });
+        }
+
+        // Wave amplitude slider
+        const waveAmplitude = document.getElementById('waveAmplitude');
+        if (waveAmplitude) {
+            waveAmplitude.addEventListener('input', (e) => {
+                this.settings.waveAmplitude = parseInt(e.target.value);
+                this.saveSettings();
+            });
+        }
+
+        // Wave speed slider
+        const waveSpeed = document.getElementById('waveSpeed');
+        if (waveSpeed) {
+            waveSpeed.addEventListener('input', (e) => {
+                this.settings.waveSpeed = parseInt(e.target.value);
+                this.saveSettings();
+            });
+        }
+
+        // Vertical movement select
+        const verticalMovement = document.getElementById('verticalMovement');
+        if (verticalMovement) {
+            verticalMovement.addEventListener('change', (e) => {
+                this.settings.verticalMovement = e.target.value;
+                this.saveSettings();
+            });
+        }
+
+        // Bass frequency slider
+        const bassFrequency = document.getElementById('bassFrequency');
+        if (bassFrequency) {
+            bassFrequency.addEventListener('input', (e) => {
+                this.settings.bassFrequency = parseInt(e.target.value);
+                this.updateBassFilter();
+                this.saveSettings();
+            });
+        }
+
+        // Bass quality slider
+        const bassQuality = document.getElementById('bassQuality');
+        if (bassQuality) {
+            bassQuality.addEventListener('input', (e) => {
+                this.settings.bassQuality = parseFloat(e.target.value);
+                this.updateBassFilter();
+                this.saveSettings();
+            });
+        }
+
+        // Randomize button
+        const randomizeBtn = document.getElementById('randomizeBtn');
+        if (randomizeBtn) {
+            randomizeBtn.addEventListener('click', () => {
+                this.randomizeSettings();
+            });
+        }
+
+        // Save preset button
+        const savePresetBtn = document.getElementById('savePreset');
+        if (savePresetBtn) {
+            savePresetBtn.removeEventListener('click', this.saveHandler);
+            savePresetBtn.addEventListener('click', this.saveHandler, { once: true });
+        }
+
+        // Load preset button
+        const loadPresetBtn = document.getElementById('loadPreset');
+        if (loadPresetBtn) {
+            loadPresetBtn.addEventListener('click', () => {
+                this.loadSelectedPreset();
+            });
+        }
+
+        // Preset select
+        const presetSelect = document.getElementById('presetSelect');
+        if (presetSelect) {
+            presetSelect.addEventListener('change', () => {
+                this.loadSelectedPreset();
+            });
         }
     }
 
     updateUIFromSettings() {
-        // Update all UI elements to match current settings
-        const elements = {
-            'colorPicker': this.settings.color,
-            'sensitivity': this.settings.sensitivity,
-            'lineCount': this.settings.lineCount,
-            'beatSensitivity': this.settings.beatSensitivity,
-            'particlesEffect': this.settings.particlesEnabled,
-            'particleSize': this.settings.particleSize,
-            'wavesEffect': this.settings.wavesEnabled,
-            'frequencyBars': this.settings.frequencyBarsEnabled,
-            'lineThickness': this.settings.lineThickness,
-            'patternMode': this.settings.patternMode,
-            'colorMode': this.settings.colorMode,
-            'colorCycleSpeed': this.settings.colorCycleSpeed,
-            'colorSaturation': this.settings.colorSaturation,
-            'colorLightness': this.settings.colorLightness,
-            'horizontalLineCount': this.settings.horizontalLineCount,
-            'horizontalLineSpacing': this.settings.horizontalLineSpacing,
-            'waveAmplitude': this.settings.waveAmplitude,
-            'waveSpeed': this.settings.waveSpeed,
-            'verticalMovement': this.settings.verticalMovement,
-            'verticalSpeed': this.settings.verticalSpeed,
-            'verticalRange': this.settings.verticalRange,
-            'bassFrequency': this.settings.bassFrequency,
-            'bassQuality': this.settings.bassQuality
-        };
-
-        for (const [id, value] of Object.entries(elements)) {
-            const element = document.getElementById(id);
-            if (element) {
-                if (element.type === 'checkbox') {
-                    element.checked = value;
-                } else {
-                    element.value = value;
-                }
-            }
-        }
-
-        // Update visibility of control sections
+        // Update pattern mode visibility
         const horizontalControls = document.getElementById('horizontalControls');
         if (horizontalControls) {
             if (this.settings.patternMode === 'horizontal') {
@@ -561,6 +348,7 @@ export class AudioVisualizer {
             }
         }
 
+        // Update color mode visibility
         const cycleControls = document.getElementById('cycleControls');
         if (cycleControls) {
             if (this.settings.colorMode === 'cycle') {
@@ -570,50 +358,306 @@ export class AudioVisualizer {
             }
         }
 
-        // Update preset select with custom presets
+        // Update input values
+        const elements = {
+            'sensitivity': this.settings.sensitivity,
+            'lineCount': this.settings.lineCount,
+            'beatSensitivity': this.settings.beatSensitivity,
+            'patternMode': this.settings.patternMode,
+            'colorMode': this.settings.colorMode,
+            'colorPicker': this.settings.color,
+            'horizontalLineCount': this.settings.horizontalLineCount,
+            'horizontalLineSpacing': this.settings.horizontalLineSpacing,
+            'waveAmplitude': this.settings.waveAmplitude,
+            'waveSpeed': this.settings.waveSpeed,
+            'verticalMovement': this.settings.verticalMovement,
+            'colorCycleSpeed': this.settings.colorCycleSpeed,
+            'colorSaturation': this.settings.colorSaturation,
+            'bassFrequency': this.settings.bassFrequency,
+            'bassQuality': this.settings.bassQuality
+        };
+
+        for (const [id, value] of Object.entries(elements)) {
+            const element = document.getElementById(id);
+            if (element) {
+                if (element.type === 'range' || element.type === 'number') {
+                    element.value = value;
+                } else if (element.type === 'color') {
+                    element.value = value;
+                } else if (element.tagName === 'SELECT') {
+                    element.value = value;
+                }
+            }
+        }
+    }
+
+    drawLines(beat) {
+        drawRadialLines(this.ctx, {
+            width: this.canvas.width,
+            height: this.canvas.height
+        }, this.dataArray, this.settings, beat);
+    }
+
+    drawHorizontalLines(beat) {
+        drawHorizontalLines(this.ctx, {
+            width: this.canvas.width,
+            height: this.canvas.height
+        }, this.dataArray, this.settings, beat);
+    }
+
+    saveSettings() {
+        saveSettings(this.settings);
+    }
+
+    loadSavedSettings() {
+        this.settings = loadSettings();
+        this.updateUIFromSettings();
+    }
+
+    detectBeat(audioData) {
+        return detectBeat(audioData, this.beatDetectionData, this.settings);
+    }
+
+    loadPreset(presetName) {
+        this.settings = loadPreset(presetName);
+        this.updateUIFromSettings();
+    }
+
+    saveCurrentAsPreset(presetName) {
+        savePreset(presetName, this.settings);
+    }
+
+    updateParticles(beat) {
+        if (beat && this.settings.particlesEnabled) {
+            this.particles.push(...createParticles({
+                width: this.canvas.width,
+                height: this.canvas.height
+            }, this.settings));
+        }
+        this.particles = updateParticles(this.ctx, this.particles, this.settings);
+    }
+
+    updateWaves(beat) {
+        if (beat && this.settings.wavesEnabled) {
+            this.waves.push(createWave());
+        }
+        this.waves = updateWaves(this.ctx, this.waves, {
+            width: this.canvas.width,
+            height: this.canvas.height
+        }, this.settings);
+    }
+
+    drawFrequencyBars() {
+        if (this.settings.frequencyBarsEnabled) {
+            drawFrequencyBars(this.ctx, {
+                width: this.canvas.width,
+                height: this.canvas.height
+            }, this.dataArray, this.settings);
+        }
+    }
+
+    get presets() {
+        return presets;
+    }
+
+    toggleSettings() {
+        const settingsPanel = document.getElementById('settingsPanel');
+        if (settingsPanel) {
+            settingsPanel.classList.toggle('hidden');
+        }
+    }
+
+    populatePresetList() {
         const presetSelect = document.getElementById('presetSelect');
         if (presetSelect) {
-            // Clear existing options first
-            while (presetSelect.options.length > 3) { // Keep default, minimal, maximal
-                presetSelect.remove(3);
-            }
-            // Add custom presets
-            Object.keys(this.presets).forEach(presetName => {
-                if (!['default', 'minimal', 'maximal'].includes(presetName)) {
-                    const option = document.createElement('option');
-                    option.value = presetName;
-                    option.textContent = presetName;
-                    presetSelect.appendChild(option);
-                }
+            // Clear existing options
+            presetSelect.innerHTML = '';
+            
+            // Add built-in presets
+            const builtInPresets = [
+                'default',
+                'minimal',
+                'maximal',
+                'neon',
+                'matrix',
+                'sunset',
+                'ocean',
+                'fire',
+                'rainbow',
+                'cosmic',
+                'retro',
+                'zen'
+            ];
+            
+            builtInPresets.forEach(presetName => {
+                const option = document.createElement('option');
+                option.value = presetName;
+                option.textContent = presetName === 'default' ? 'Default' :
+                                   presetName === 'neon' ? 'Neon Pulse' :
+                                   presetName === 'matrix' ? 'Matrix' :
+                                   presetName === 'sunset' ? 'Sunset Waves' :
+                                   presetName === 'ocean' ? 'Ocean Deep' :
+                                   presetName === 'fire' ? 'Fire Dance' :
+                                   presetName === 'rainbow' ? 'Rainbow Flow' :
+                                   presetName === 'cosmic' ? 'Cosmic Rays' :
+                                   presetName === 'retro' ? 'Retro Wave' :
+                                   presetName === 'zen' ? 'Zen Garden' :
+                                   presetName.charAt(0).toUpperCase() + presetName.slice(1);
+                presetSelect.appendChild(option);
+            });
+            
+            // Load and add custom presets from localStorage
+            const savedPresets = JSON.parse(localStorage.getItem('presets') || '{}');
+            Object.keys(savedPresets).forEach(presetName => {
+                const option = document.createElement('option');
+                option.value = presetName;
+                option.textContent = presetName;
+                presetSelect.appendChild(option);
             });
         }
     }
 
-    loadPreset(presetName) {
-        const preset = this.presets[presetName];
-        if (!preset) return;
+    saveNewPreset() {
+        const presetNameInput = document.getElementById('newPresetName');
+        console.log('Input element:', presetNameInput);
+        console.log('Input value:', presetNameInput?.value);
         
-        // Update settings
-        Object.assign(this.settings, preset);
+        if (!presetNameInput) {
+            console.error('Could not find preset name input element');
+            return;
+        }
         
-        // Update UI
-        this.updateUIFromSettings();
+        const presetName = presetNameInput.value?.trim();
+        console.log('Trimmed preset name:', presetName);
         
-        // Save the current settings
-        this.saveSettings();
+        if (!presetName) {
+            alert('Please enter a name for the preset');
+            return;
+        }
+        
+        // Get existing presets from localStorage
+        const savedPresets = JSON.parse(localStorage.getItem('presets') || '{}');
+        
+        // Add new preset
+        savedPresets[presetName] = { ...this.settings };
+        
+        // Save back to localStorage
+        localStorage.setItem('presets', JSON.stringify(savedPresets));
+        
+        // Add just the new option to the select dropdown
+        const presetSelect = document.getElementById('presetSelect');
+        if (presetSelect) {
+            const option = document.createElement('option');
+            option.value = presetName;
+            option.textContent = presetName;
+            presetSelect.appendChild(option);
+            presetSelect.value = presetName;
+        }
+        
+        // Clear the input field
+        presetNameInput.value = '';
     }
 
-    saveCurrentAsPreset(presetName) {
-        this.presets[presetName] = {...this.settings};
-        this.saveSettings();
-    }
-
-    updateVisualizationSettings() {
-        if (this.ctx) {
-            this.ctx.lineWidth = this.settings.lineThickness;
-            // Always ensure glow is off
-            this.ctx.shadowBlur = 0;
-            this.ctx.shadowColor = 'transparent';
+    loadSelectedPreset() {
+        const presetSelect = document.getElementById('presetSelect');
+        if (presetSelect) {
+            const selectedPreset = presetSelect.value;
+            
+            // Check if it's a built-in preset
+            if (this.presets[selectedPreset]) {
+                this.settings = { ...this.settings, ...this.presets[selectedPreset] };
+            } else {
+                // Load custom preset from localStorage
+                const savedPresets = JSON.parse(localStorage.getItem('presets') || '{}');
+                if (savedPresets[selectedPreset]) {
+                    this.settings = { ...this.settings, ...savedPresets[selectedPreset] };
+                }
+            }
+            
+            // Update UI and save settings
+            this.updateUIFromSettings();
+            this.saveSettings();
+            
+            // Update bass filter if it exists
+            this.updateBassFilter();
         }
     }
-} 
+
+    updateBassFilter() {
+        if (this.bassFilter) {
+            this.bassFilter.frequency.value = this.settings.bassFrequency;
+            this.bassFilter.Q.value = this.settings.bassQuality;
+        }
+    }
+
+    randomizeSettings() {
+        // Randomize various settings
+        this.settings.lineCount = Math.floor(Math.random() * 150) + 50;
+        this.settings.sensitivity = Math.floor(Math.random() * 75) + 25;
+        this.settings.beatSensitivity = Math.random() * 1.5 + 0.5;
+        
+        // Generate valid 6-digit hex color
+        const r = Math.floor(Math.random() * 255).toString(16).padStart(2, '0');
+        const g = Math.floor(Math.random() * 255).toString(16).padStart(2, '0');
+        const b = Math.floor(Math.random() * 255).toString(16).padStart(2, '0');
+        this.settings.color = `#${r}${g}${b}`;
+        
+        this.settings.colorCycleSpeed = Math.floor(Math.random() * 100);
+        this.settings.colorSaturation = Math.floor(Math.random() * 100);
+        
+        // Save and update UI
+        this.updateUIFromSettings();
+        this.saveSettings();
+    }
+}
+
+// Initialize on DOM content loaded
+window.addEventListener('DOMContentLoaded', () => {
+    // Verify all required elements exist
+    const requiredElements = [
+        'canvas',
+        'startAudio',
+        'fullscreenBtn',
+        'colorPicker',
+        'sensitivity',
+        'lineCount',
+        'toggleSettings',
+        'particlesEffect',
+        'particleSize',
+        'wavesEffect',
+        'frequencyBars',
+        'lineThickness',
+        'patternMode',
+        'horizontalControls',
+        'colorMode',
+        'cycleControls',
+        'colorCycleSpeed',
+        'colorSaturation',
+        'colorLightness',
+        'horizontalLineCount',
+        'horizontalLineSpacing',
+        'waveAmplitude',
+        'waveSpeed',
+        'verticalMovement',
+        'verticalSpeed',
+        'verticalRange',
+        'settings',
+        'presetSelect',
+        'loadPreset',
+        'newPresetName',
+        'savePreset',
+        'bassFrequency',
+        'bassQuality'
+    ];
+
+    const missingElements = requiredElements.filter(id => !document.getElementById(id));
+    
+    if (missingElements.length > 0) {
+        console.error('Missing HTML elements:', missingElements);
+        return;
+    }
+
+    // Initialize visualizer
+    const visualizer = new AudioVisualizer();
+    setTimeout(() => visualizer.startAudio(), 100);
+}); 

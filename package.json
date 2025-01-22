@@ -2,6 +2,7 @@
   "name": "laser-visualizer",
   "version": "1.0.0",
   "description": "Audio-responsive laser projection visualization",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
