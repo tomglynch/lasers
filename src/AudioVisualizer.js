@@ -6,6 +6,7 @@ import { initializeAudio, detectBeat, setupAudioInput } from './utils/AudioUtils
 import { updateCycleColor } from './utils/ColorUtils.js';
 import { drawRadialLines } from './patterns/RadialPattern.js';
 import { drawHorizontalLines } from './patterns/HorizontalPattern.js';
+import { drawOvals } from './patterns/OvalPattern.js';
 import { createParticles, updateParticles } from './effects/ParticleEffect.js';
 import { createWave, updateWaves } from './effects/WaveEffect.js';
 import { drawFrequencyBars } from './effects/FrequencyBars.js';
@@ -123,6 +124,8 @@ export class AudioVisualizer {
         // Draw based on pattern mode
         if (this.settings.patternMode === 'horizontal') {
             drawHorizontalLines(this.ctx, dimensions, this.dataArray, this.settings, beat);
+        } else if (this.settings.patternMode === 'oval') {
+            drawOvals(this.ctx, dimensions, this.dataArray, this.settings, beat);
         } else {
             drawRadialLines(this.ctx, dimensions, this.dataArray, this.settings, beat);
         }
@@ -146,6 +149,31 @@ export class AudioVisualizer {
     }
 
     setupEventListeners() {
+        // Helper function to update slider value display
+        const updateSliderValue = (slider) => {
+            const container = slider.closest('.slider-container');
+            if (container) {
+                const currentValue = container.querySelector('.current-value');
+                if (currentValue) {
+                    currentValue.textContent = slider.value;
+                }
+            }
+        };
+
+        // Helper function to add slider listener
+        const addSliderListener = (elementId, settingKey, parseFunc = parseInt) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.addEventListener('input', (e) => {
+                    this.settings[settingKey] = parseFunc(e.target.value);
+                    updateSliderValue(e.target);
+                    this.saveSettings();
+                });
+                // Initialize value display
+                updateSliderValue(element);
+            }
+        };
+
         // Start audio button
         const startAudioBtn = document.getElementById('startAudio');
         if (startAudioBtn) {
@@ -168,7 +196,7 @@ export class AudioVisualizer {
         const toggleSettings = document.getElementById('toggleSettings');
         if (toggleSettings) {
             toggleSettings.addEventListener('click', () => {
-                const settingsPanel = document.getElementById('settingsPanel');
+                const settingsPanel = document.getElementById('settings');
                 if (settingsPanel) {
                     settingsPanel.classList.toggle('visible');
                 }
@@ -184,32 +212,25 @@ export class AudioVisualizer {
             });
         }
 
-        // Sensitivity slider
-        const sensitivity = document.getElementById('sensitivity');
-        if (sensitivity) {
-            sensitivity.addEventListener('input', (e) => {
-                this.settings.sensitivity = parseInt(e.target.value);
-                this.saveSettings();
-            });
-        }
-
-        // Line count slider
-        const lineCount = document.getElementById('lineCount');
-        if (lineCount) {
-            lineCount.addEventListener('input', (e) => {
-                this.settings.lineCount = parseInt(e.target.value);
-                this.saveSettings();
-            });
-        }
-
-        // Beat sensitivity slider
-        const beatSensitivity = document.getElementById('beatSensitivity');
-        if (beatSensitivity) {
-            beatSensitivity.addEventListener('input', (e) => {
-                this.settings.beatSensitivity = parseFloat(e.target.value);
-                this.saveSettings();
-            });
-        }
+        // Add listeners for all sliders
+        addSliderListener('sensitivity', 'sensitivity');
+        addSliderListener('lineCount', 'lineCount');
+        addSliderListener('lineThickness', 'lineThickness');
+        addSliderListener('beatSensitivity', 'beatSensitivity', parseFloat);
+        addSliderListener('beatIntensity', 'beatIntensity', parseFloat);
+        addSliderListener('beatDecay', 'beatDecay', parseFloat);
+        addSliderListener('colorCycleSpeed', 'colorCycleSpeed', parseFloat);
+        addSliderListener('colorSaturation', 'colorSaturation');
+        addSliderListener('colorLightness', 'colorLightness');
+        addSliderListener('horizontalLineCount', 'horizontalLineCount');
+        addSliderListener('horizontalLineSpacing', 'horizontalLineSpacing');
+        addSliderListener('waveAmplitude', 'waveAmplitude');
+        addSliderListener('waveSpeed', 'waveSpeed', parseFloat);
+        addSliderListener('verticalSpeed', 'verticalSpeed', parseFloat);
+        addSliderListener('verticalRange', 'verticalRange');
+        addSliderListener('bassFrequency', 'bassFrequency');
+        addSliderListener('bassQuality', 'bassQuality', parseFloat);
+        addSliderListener('particleSize', 'particleSize');
 
         // Pattern mode select
         const patternMode = document.getElementById('patternMode');
@@ -231,51 +252,6 @@ export class AudioVisualizer {
             });
         }
 
-        // Color cycle speed slider
-        const colorCycleSpeed = document.getElementById('colorCycleSpeed');
-        if (colorCycleSpeed) {
-            colorCycleSpeed.addEventListener('input', (e) => {
-                this.settings.colorCycleSpeed = parseInt(e.target.value);
-                this.saveSettings();
-            });
-        }
-
-        // Horizontal line count slider
-        const horizontalLineCount = document.getElementById('horizontalLineCount');
-        if (horizontalLineCount) {
-            horizontalLineCount.addEventListener('input', (e) => {
-                this.settings.horizontalLineCount = parseInt(e.target.value);
-                this.saveSettings();
-            });
-        }
-
-        // Horizontal line spacing slider
-        const horizontalLineSpacing = document.getElementById('horizontalLineSpacing');
-        if (horizontalLineSpacing) {
-            horizontalLineSpacing.addEventListener('input', (e) => {
-                this.settings.horizontalLineSpacing = parseInt(e.target.value);
-                this.saveSettings();
-            });
-        }
-
-        // Wave amplitude slider
-        const waveAmplitude = document.getElementById('waveAmplitude');
-        if (waveAmplitude) {
-            waveAmplitude.addEventListener('input', (e) => {
-                this.settings.waveAmplitude = parseInt(e.target.value);
-                this.saveSettings();
-            });
-        }
-
-        // Wave speed slider
-        const waveSpeed = document.getElementById('waveSpeed');
-        if (waveSpeed) {
-            waveSpeed.addEventListener('input', (e) => {
-                this.settings.waveSpeed = parseInt(e.target.value);
-                this.saveSettings();
-            });
-        }
-
         // Vertical movement select
         const verticalMovement = document.getElementById('verticalMovement');
         if (verticalMovement) {
@@ -285,22 +261,27 @@ export class AudioVisualizer {
             });
         }
 
-        // Bass frequency slider
-        const bassFrequency = document.getElementById('bassFrequency');
-        if (bassFrequency) {
-            bassFrequency.addEventListener('input', (e) => {
-                this.settings.bassFrequency = parseInt(e.target.value);
-                this.updateBassFilter();
+        // Effect checkboxes
+        const particlesEffect = document.getElementById('particlesEffect');
+        if (particlesEffect) {
+            particlesEffect.addEventListener('change', (e) => {
+                this.settings.particlesEnabled = e.target.checked;
                 this.saveSettings();
             });
         }
 
-        // Bass quality slider
-        const bassQuality = document.getElementById('bassQuality');
-        if (bassQuality) {
-            bassQuality.addEventListener('input', (e) => {
-                this.settings.bassQuality = parseFloat(e.target.value);
-                this.updateBassFilter();
+        const wavesEffect = document.getElementById('wavesEffect');
+        if (wavesEffect) {
+            wavesEffect.addEventListener('change', (e) => {
+                this.settings.wavesEnabled = e.target.checked;
+                this.saveSettings();
+            });
+        }
+
+        const frequencyBars = document.getElementById('frequencyBars');
+        if (frequencyBars) {
+            frequencyBars.addEventListener('change', (e) => {
+                this.settings.frequencyBarsEnabled = e.target.checked;
                 this.saveSettings();
             });
         }
@@ -335,17 +316,89 @@ export class AudioVisualizer {
                 this.loadSelectedPreset();
             });
         }
+
+        // Add listeners for oval pattern controls
+        addSliderListener('ovalCount', 'ovalCount');
+        addSliderListener('ovalSize', 'ovalSize');
+        addSliderListener('ovalMovementSpeed', 'ovalMovementSpeed');
+        addSliderListener('ovalMovementRange', 'ovalMovementRange');
+        addSliderListener('ovalHeightOffset', 'ovalHeightOffset');
+        addSliderListener('ovalWidthRatio', 'ovalWidthRatio', parseFloat);
+        addSliderListener('ovalRotationSpeed', 'ovalRotationSpeed', parseFloat);
+        
+        // Special handling for rotation offset to convert degrees to radians
+        const ovalRotationOffset = document.getElementById('ovalRotationOffset');
+        if (ovalRotationOffset) {
+            ovalRotationOffset.addEventListener('input', (e) => {
+                // Convert degrees to radians
+                this.settings.ovalRotationOffset = (parseFloat(e.target.value) * Math.PI) / 180;
+                const container = e.target.closest('.slider-container');
+                if (container) {
+                    const currentValue = container.querySelector('.current-value');
+                    if (currentValue) {
+                        currentValue.textContent = e.target.value + '°';
+                    }
+                }
+                this.saveSettings();
+            });
+        }
+
+        const ovalStyle = document.getElementById('ovalStyle');
+        if (ovalStyle) {
+            ovalStyle.addEventListener('change', (e) => {
+                this.settings.ovalStyle = e.target.value;
+                
+                // Update UI for ovalsv2 style
+                const ovalControls = document.getElementById('ovalControls');
+                if (ovalControls) {
+                    if (e.target.value === 'ovalsv2') {
+                        ovalControls.classList.add('ovalsv2');
+                    } else {
+                        ovalControls.classList.remove('ovalsv2');
+                    }
+                }
+                
+                this.saveSettings();
+            });
+        }
+
+        // Update UI based on current style
+        const ovalControls = document.getElementById('ovalControls');
+        if (ovalControls && this.settings.ovalStyle === 'ovalsv2') {
+            ovalControls.classList.add('ovalsv2');
+        }
+
+        const ovalSecondaryColor = document.getElementById('ovalSecondaryColor');
+        if (ovalSecondaryColor) {
+            ovalSecondaryColor.addEventListener('input', (e) => {
+                this.settings.ovalSecondaryColor = e.target.value;
+                this.saveSettings();
+            });
+        }
     }
 
     updateUIFromSettings() {
+        // Helper function to update slider value display
+        const updateSliderValue = (slider) => {
+            const container = slider.closest('.slider-container');
+            if (container) {
+                const currentValue = container.querySelector('.current-value');
+                if (currentValue) {
+                    currentValue.textContent = slider.value;
+                }
+            }
+        };
+
         // Update pattern mode visibility
         const horizontalControls = document.getElementById('horizontalControls');
+        const ovalControls = document.getElementById('ovalControls');
+        
         if (horizontalControls) {
-            if (this.settings.patternMode === 'horizontal') {
-                horizontalControls.classList.add('visible');
-            } else {
-                horizontalControls.classList.remove('visible');
-            }
+            horizontalControls.classList.toggle('visible', this.settings.patternMode === 'horizontal');
+        }
+        
+        if (ovalControls) {
+            ovalControls.classList.toggle('visible', this.settings.patternMode === 'oval');
         }
 
         // Update color mode visibility
@@ -362,7 +415,10 @@ export class AudioVisualizer {
         const elements = {
             'sensitivity': this.settings.sensitivity,
             'lineCount': this.settings.lineCount,
+            'lineThickness': this.settings.lineThickness,
             'beatSensitivity': this.settings.beatSensitivity,
+            'beatIntensity': this.settings.beatIntensity,
+            'beatDecay': this.settings.beatDecay,
             'patternMode': this.settings.patternMode,
             'colorMode': this.settings.colorMode,
             'colorPicker': this.settings.color,
@@ -371,23 +427,56 @@ export class AudioVisualizer {
             'waveAmplitude': this.settings.waveAmplitude,
             'waveSpeed': this.settings.waveSpeed,
             'verticalMovement': this.settings.verticalMovement,
+            'verticalSpeed': this.settings.verticalSpeed,
+            'verticalRange': this.settings.verticalRange,
             'colorCycleSpeed': this.settings.colorCycleSpeed,
             'colorSaturation': this.settings.colorSaturation,
+            'colorLightness': this.settings.colorLightness,
             'bassFrequency': this.settings.bassFrequency,
-            'bassQuality': this.settings.bassQuality
+            'bassQuality': this.settings.bassQuality,
+            'particleSize': this.settings.particleSize
         };
 
+        // Update checkbox states
+        const checkboxes = {
+            'particlesEffect': this.settings.particlesEnabled,
+            'wavesEffect': this.settings.wavesEnabled,
+            'frequencyBars': this.settings.frequencyBarsEnabled
+        };
+
+        // Update all input elements
         for (const [id, value] of Object.entries(elements)) {
             const element = document.getElementById(id);
             if (element) {
                 if (element.type === 'range' || element.type === 'number') {
                     element.value = value;
+                    updateSliderValue(element);
                 } else if (element.type === 'color') {
                     element.value = value;
                 } else if (element.tagName === 'SELECT') {
                     element.value = value;
                 }
             }
+        }
+
+        // Update all checkbox elements
+        for (const [id, value] of Object.entries(checkboxes)) {
+            const element = document.getElementById(id);
+            if (element && element.type === 'checkbox') {
+                element.checked = value;
+            }
+        }
+
+        // Update oval style select
+        const ovalStyle = document.getElementById('ovalStyle');
+        if (ovalStyle) {
+            ovalStyle.value = this.settings.ovalStyle || 'slow';
+        }
+
+        // Update oval secondary color
+        const ovalSecondaryColor = document.getElementById('ovalSecondaryColor');
+        if (ovalSecondaryColor) {
+            ovalSecondaryColor.value = this.settings.ovalSecondaryColor || '#00ff00';
         }
     }
 
@@ -591,10 +680,10 @@ export class AudioVisualizer {
     }
 
     randomizeSettings() {
-        // Randomize various settings
-        this.settings.lineCount = Math.floor(Math.random() * 150) + 50;
-        this.settings.sensitivity = Math.floor(Math.random() * 75) + 25;
-        this.settings.beatSensitivity = Math.random() * 1.5 + 0.5;
+        // Use ranges from test cases (lines 141-144 in Settings.test.js)
+        this.settings.lineCount = Math.floor(Math.random() * 13) + 3; // 3-16 range
+        this.settings.sensitivity = Math.floor(Math.random() * 40) + 30; // 30-70 range
+        this.settings.beatSensitivity = Math.random() * 0.2 + 0.2; // 0.2-0.4 range
         
         // Generate valid 6-digit hex color
         const r = Math.floor(Math.random() * 255).toString(16).padStart(2, '0');
@@ -602,62 +691,25 @@ export class AudioVisualizer {
         const b = Math.floor(Math.random() * 255).toString(16).padStart(2, '0');
         this.settings.color = `#${r}${g}${b}`;
         
-        this.settings.colorCycleSpeed = Math.floor(Math.random() * 100);
-        this.settings.colorSaturation = Math.floor(Math.random() * 100);
+        // Use ranges from test cases and presets
+        this.settings.colorCycleSpeed = Math.random() * 4.5 + 0.5; // 0.5-5.0 range
+        this.settings.colorSaturation = Math.floor(Math.random() * 60) + 40; // 40-100 range
+        this.settings.beatIntensity = Math.random() * 1.3 + 1.2; // 1.2-2.5 range
+        this.settings.beatDecay = Math.random() * 0.04 + 0.95; // 0.95-0.99 range
+        
+        // Pattern-specific settings
+        this.settings.horizontalLineCount = Math.floor(Math.random() * 6) + 2; // 2-8 range
+        this.settings.horizontalLineSpacing = Math.floor(Math.random() * 100) + 50; // 50-150 range
+        this.settings.waveAmplitude = Math.floor(Math.random() * 70) + 30; // 30-100 range
+        this.settings.waveSpeed = Math.random() * 3 + 1; // 1-4 range
+        
+        // Random boolean settings
+        this.settings.patternMode = Math.random() < 0.5 ? 'radial' : 'horizontal';
+        this.settings.colorMode = Math.random() < 0.5 ? 'static' : 'cycle';
+        this.settings.verticalMovement = Math.random() < 0.7 ? 'updown' : 'none';
         
         // Save and update UI
         this.updateUIFromSettings();
         this.saveSettings();
     }
-}
-
-// Initialize on DOM content loaded
-window.addEventListener('DOMContentLoaded', () => {
-    // Verify all required elements exist
-    const requiredElements = [
-        'canvas',
-        'startAudio',
-        'fullscreenBtn',
-        'colorPicker',
-        'sensitivity',
-        'lineCount',
-        'toggleSettings',
-        'particlesEffect',
-        'particleSize',
-        'wavesEffect',
-        'frequencyBars',
-        'lineThickness',
-        'patternMode',
-        'horizontalControls',
-        'colorMode',
-        'cycleControls',
-        'colorCycleSpeed',
-        'colorSaturation',
-        'colorLightness',
-        'horizontalLineCount',
-        'horizontalLineSpacing',
-        'waveAmplitude',
-        'waveSpeed',
-        'verticalMovement',
-        'verticalSpeed',
-        'verticalRange',
-        'settings',
-        'presetSelect',
-        'loadPreset',
-        'newPresetName',
-        'savePreset',
-        'bassFrequency',
-        'bassQuality'
-    ];
-
-    const missingElements = requiredElements.filter(id => !document.getElementById(id));
-    
-    if (missingElements.length > 0) {
-        console.error('Missing HTML elements:', missingElements);
-        return;
-    }
-
-    // Initialize visualizer
-    const visualizer = new AudioVisualizer();
-    setTimeout(() => visualizer.startAudio(), 100);
-}); 
+} 

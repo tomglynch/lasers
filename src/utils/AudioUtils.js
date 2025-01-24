@@ -43,14 +43,20 @@ export async function initializeAudio(stream, settings) {
 export function detectBeat(audioData, beatData, settings) {
     // Calculate energy in sub-bass frequencies
     let energy = 0;
-    for (let i = 0; i < 10; i++) {
-        energy += audioData[i];
+    // Sum energy between ~100Hz (bin 10) and ~400Hz (bin 40) to detect bass frequencies
+    energy = audioData.subarray(10, 40).reduce((sum, value) => sum + value, 0);
+    energy = energy / 3000; // Normalize to 0-1 range (30 bins * 255 max value)
+    // Add minimum energy threshold to filter out silence
+    const MIN_ENERGY = 0.15;
+    if (energy < MIN_ENERGY) {
+        return false;
     }
-    energy = energy / 2550; // Normalize to 0-1 range
 
-    // Check if enough time has passed since last beat
+    // Check if enough time has passed since last beat 
+    // (150ms is slightly less than the gap between the two fast ones in a dnb song)
     const now = Date.now();
-    if (now - beatData.lastBeatTime < settings.minTimeBetweenBeats) {
+    if (now - beatData.lastBeatTime < 150) {
+        console.log("Beat rejected: beat too recent");
         return false;
     }
     
@@ -58,16 +64,33 @@ export function detectBeat(audioData, beatData, settings) {
     beatData.energy.history.push(energy);
     beatData.energy.history.shift();
     
-    // Calculate dynamic threshold
+    // Calculate dynamic threshold with a minimum value
     const sum = beatData.energy.history.reduce((a, b) => a + b, 0);
     const avg = sum / beatData.energy.history.length;
-    beatData.threshold = avg * settings.beatSensitivity;
+    const MIN_THRESHOLD = 0.15;
+    // The threshold grows over time because we keep adding energy values to history
+    // and calculating average. Let's add a maximum threshold to prevent it from
+    // getting too high
+    const MAX_THRESHOLD = 0.4;
+    beatData.threshold = Math.min(
+        Math.max(avg * settings.beatSensitivity, MIN_THRESHOLD),
+        MAX_THRESHOLD
+    );
     
-    // Detect beat
-    if (energy > beatData.threshold && energy > beatData.energy.previous) {
+    // Detect beat with less strict conditions
+    // Removed the 1.3 * avg condition since the average was making it harder over time
+    if (energy > beatData.threshold && 
+        energy > beatData.energy.previous) {
         beatData.lastBeatTime = now;
         beatData.energy.previous = energy;
+        console.log("Beat detected", {energy, threshold: beatData.threshold, avg});
         return true;
+    } else {
+        if (energy <= beatData.threshold) {
+            console.log("Beat rejected: energy below threshold", {energy, threshold: beatData.threshold});
+        } else if (energy <= beatData.energy.previous) {
+            console.log("Beat rejected: energy not increasing", {energy, previous: beatData.energy.previous});
+        }
     }
     
     beatData.energy.previous = energy;

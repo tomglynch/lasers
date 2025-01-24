@@ -129,6 +129,25 @@
             width: 16px;
             height: 16px;
         }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .min-value, .max-value, .current-value {
+            width: 30px;
+            text-align: center;
+        }
+        
+        #ovalControls .rotation-control {
+            transition: opacity 0.3s;
+        }
+        
+        #ovalControls.ovalsv2 .rotation-control {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -146,19 +165,35 @@
             <select id="patternMode">
                 <option value="radial">Radial</option>
                 <option value="horizontal">Horizontal</option>
+                <option value="oval">Oval</option>
             </select>
         </div>
 
         <div class="settings-section">
             <h4>Line Settings</h4>
             <label>Line Count:
-                <input type="range" id="lineCount" min="1" max="20" value="8">
+                <div class="slider-container">
+                    <span class="min-value">1</span>
+                    <input type="range" id="lineCount" min="1" max="20" value="8">
+                    <span class="max-value">20</span>
+                    <span class="current-value">8</span>
+                </div>
             </label>
             <label>Line Thickness:
-                <input type="range" id="lineThickness" min="1" max="10" value="2">
+                <div class="slider-container">
+                    <span class="min-value">1</span>
+                    <input type="range" id="lineThickness" min="1" max="10" value="2">
+                    <span class="max-value">10</span>
+                    <span class="current-value">2</span>
+                </div>
             </label>
             <label>Sensitivity:
-                <input type="range" id="sensitivity" min="1" max="100" value="50">
+                <div class="slider-container">
+                    <span class="min-value">1</span>
+                    <input type="range" id="sensitivity" min="1" max="100" value="50">
+                    <span class="max-value">100</span>
+                    <span class="current-value">50</span>
+                </div>
             </label>
         </div>
 
@@ -179,13 +214,28 @@
             </div>
             <div id="cycleControls">
                 <label>Cycle Speed:
-                    <input type="range" id="colorCycleSpeed" min="0.1" max="10" step="0.1" value="2">
+                    <div class="slider-container">
+                        <span class="min-value">0.1</span>
+                        <input type="range" id="colorCycleSpeed" min="0.1" max="10" step="0.1" value="2">
+                        <span class="max-value">10</span>
+                        <span class="current-value">2</span>
+                    </div>
                 </label>
                 <label>Saturation:
-                    <input type="range" id="colorSaturation" min="0" max="100" value="100">
+                    <div class="slider-container">
+                        <span class="min-value">0</span>
+                        <input type="range" id="colorSaturation" min="0" max="100" value="100">
+                        <span class="max-value">100</span>
+                        <span class="current-value">100</span>
+                    </div>
                 </label>
                 <label>Lightness:
-                    <input type="range" id="colorLightness" min="0" max="100" value="50">
+                    <div class="slider-container">
+                        <span class="min-value">0</span>
+                        <input type="range" id="colorLightness" min="0" max="100" value="50">
+                        <span class="max-value">100</span>
+                        <span class="current-value">50</span>
+                    </div>
                 </label>
             </div>
         </div>
@@ -193,19 +243,44 @@
         <div class="settings-section">
             <h4>Beat Detection</h4>
             <label>Bass Frequency:
-                <input type="range" id="bassFrequency" min="20" max="400" value="150">
+                <div class="slider-container">
+                    <span class="min-value">20</span>
+                    <input type="range" id="bassFrequency" min="20" max="400" value="150">
+                    <span class="max-value">400</span>
+                    <span class="current-value">150</span>
+                </div>
             </label>
             <label>Bass Quality (Q):
-                <input type="range" id="bassQuality" min="0.1" max="5" step="0.1" value="1">
+                <div class="slider-container">
+                    <span class="min-value">0.1</span>
+                    <input type="range" id="bassQuality" min="0.1" max="5" step="0.1" value="1">
+                    <span class="max-value">5</span>
+                    <span class="current-value">1</span>
+                </div>
             </label>
             <label>Beat Sensitivity:
-                <input type="range" id="beatSensitivity" min="0.1" max="0.5" step="0.05" value="0.3">
+                <div class="slider-container">
+                    <span class="min-value">0.1</span>
+                    <input type="range" id="beatSensitivity" min="0.1" max="0.5" step="0.05" value="0.3">
+                    <span class="max-value">0.5</span>
+                    <span class="current-value">0.3</span>
+                </div>
             </label>
             <label>Beat Intensity:
-                <input type="range" id="beatIntensity" min="1" max="3" step="0.1" value="1.5">
+                <div class="slider-container">
+                    <span class="min-value">1</span>
+                    <input type="range" id="beatIntensity" min="1" max="3" step="0.1" value="1.5">
+                    <span class="max-value">3</span>
+                    <span class="current-value">1.5</span>
+                </div>
             </label>
             <label>Beat Decay:
-                <input type="range" id="beatDecay" min="0.9" max="0.99" step="0.01" value="0.98">
+                <div class="slider-container">
+                    <span class="min-value">0.9</span>
+                    <input type="range" id="beatDecay" min="0.9" max="0.99" step="0.01" value="0.98">
+                    <span class="max-value">0.99</span>
+                    <span class="current-value">0.98</span>
+                </div>
             </label>
         </div>
 
@@ -216,7 +291,12 @@
                 Enable Particles
             </label>
             <label>Particle Size:
-                <input type="range" id="particleSize" min="1" max="10" value="3">
+                <div class="slider-container">
+                    <span class="min-value">1</span>
+                    <input type="range" id="particleSize" min="1" max="10" value="3">
+                    <span class="max-value">10</span>
+                    <span class="current-value">3</span>
+                </div>
             </label>
             <label class="checkbox-label">
                 <input type="checkbox" id="wavesEffect" checked>
@@ -231,16 +311,36 @@
         <div id="horizontalControls" class="settings-section">
             <h4>Horizontal Pattern Settings</h4>
             <label>Number of Lines:
-                <input type="range" id="horizontalLineCount" min="1" max="10" value="3">
+                <div class="slider-container">
+                    <span class="min-value">1</span>
+                    <input type="range" id="horizontalLineCount" min="1" max="10" value="3">
+                    <span class="max-value">10</span>
+                    <span class="current-value">3</span>
+                </div>
             </label>
             <label>Line Spacing:
-                <input type="range" id="horizontalLineSpacing" min="20" max="200" value="100">
+                <div class="slider-container">
+                    <span class="min-value">20</span>
+                    <input type="range" id="horizontalLineSpacing" min="20" max="200" value="100">
+                    <span class="max-value">200</span>
+                    <span class="current-value">100</span>
+                </div>
             </label>
             <label>Wave Amplitude:
-                <input type="range" id="waveAmplitude" min="0" max="200" value="50">
+                <div class="slider-container">
+                    <span class="min-value">0</span>
+                    <input type="range" id="waveAmplitude" min="0" max="200" value="50">
+                    <span class="max-value">200</span>
+                    <span class="current-value">50</span>
+                </div>
             </label>
             <label>Wave Speed:
-                <input type="range" id="waveSpeed" min="0" max="10" value="2" step="0.1">
+                <div class="slider-container">
+                    <span class="min-value">0</span>
+                    <input type="range" id="waveSpeed" min="0" max="10" value="2" step="0.1">
+                    <span class="max-value">10</span>
+                    <span class="current-value">2</span>
+                </div>
             </label>
             <label>Vertical Movement:
                 <select id="verticalMovement">
@@ -249,10 +349,99 @@
                 </select>
             </label>
             <label>Vertical Speed:
-                <input type="range" id="verticalSpeed" min="0.1" max="5" step="0.1" value="1">
+                <div class="slider-container">
+                    <span class="min-value">0.1</span>
+                    <input type="range" id="verticalSpeed" min="0.1" max="5" step="0.1" value="1">
+                    <span class="max-value">5</span>
+                    <span class="current-value">1</span>
+                </div>
             </label>
             <label>Vertical Range:
-                <input type="range" id="verticalRange" min="10" max="400" value="200">
+                <div class="slider-container">
+                    <span class="min-value">10</span>
+                    <input type="range" id="verticalRange" min="10" max="400" value="200">
+                    <span class="max-value">400</span>
+                    <span class="current-value">200</span>
+                </div>
+            </label>
+        </div>
+
+        <div id="ovalControls" class="settings-section">
+            <h4>Oval Pattern Settings</h4>
+            <label>Style:
+                <select id="ovalStyle">
+                    <option value="slow">Slow Float</option>
+                    <option value="wave">Wave Motion</option>
+                    <option value="double">Double Ovals</option>
+                    <option value="ovalsv2">Wide Pairs (No Rotation)</option>
+                </select>
+            </label>
+            <label>Number of Ovals:
+                <div class="slider-container">
+                    <span class="min-value">1</span>
+                    <input type="range" id="ovalCount" min="1" max="4" value="3">
+                    <span class="max-value">4</span>
+                    <span class="current-value">3</span>
+                </div>
+            </label>
+            <label>Oval Size:
+                <div class="slider-container">
+                    <span class="min-value">10</span>
+                    <input type="range" id="ovalSize" min="10" max="200" value="50">
+                    <span class="max-value">200</span>
+                    <span class="current-value">50</span>
+                </div>
+            </label>
+            <label>Movement Speed:
+                <div class="slider-container">
+                    <span class="min-value">0.5</span>
+                    <input type="range" id="ovalMovementSpeed" min="0.5" max="5" step="0.1" value="2">
+                    <span class="max-value">5</span>
+                    <span class="current-value">2</span>
+                </div>
+            </label>
+            <label>Movement Range:
+                <div class="slider-container">
+                    <span class="min-value">50</span>
+                    <input type="range" id="ovalMovementRange" min="50" max="400" value="100">
+                    <span class="max-value">400</span>
+                    <span class="current-value">100</span>
+                </div>
+            </label>
+            <label>Height Offset (%):
+                <div class="slider-container">
+                    <span class="min-value">-50</span>
+                    <input type="range" id="ovalHeightOffset" min="-50" max="50" value="0">
+                    <span class="max-value">50</span>
+                    <span class="current-value">0</span>
+                </div>
+            </label>
+            <label>Width Ratio:
+                <div class="slider-container">
+                    <span class="min-value">0.5</span>
+                    <input type="range" id="ovalWidthRatio" min="0.5" max="4" step="0.1" value="1">
+                    <span class="max-value">4</span>
+                    <span class="current-value">1</span>
+                </div>
+            </label>
+            <label class="rotation-control">Rotation Speed (rps):
+                <div class="slider-container">
+                    <span class="min-value">-2</span>
+                    <input type="range" id="ovalRotationSpeed" min="-2" max="2" step="0.1" value="0.2">
+                    <span class="max-value">2</span>
+                    <span class="current-value">0.2</span>
+                </div>
+            </label>
+            <label class="rotation-control">Rotation Offset:
+                <div class="slider-container">
+                    <span class="min-value">0°</span>
+                    <input type="range" id="ovalRotationOffset" min="0" max="360" value="0">
+                    <span class="max-value">360°</span>
+                    <span class="current-value">0°</span>
+                </div>
+            </label>
+            <label class="color-control">Secondary Color:
+                <input type="color" id="ovalSecondaryColor" value="#00ff00">
             </label>
         </div>
 

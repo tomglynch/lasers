@@ -45,6 +45,18 @@ export const defaultSettings = {
     verticalSpeed: 1,
     verticalRange: 200,
     
+    // Oval pattern specific
+    ovalCount: 3,
+    ovalSize: 50,
+    ovalStyle: 'slow',
+    ovalMovementSpeed: 2,
+    ovalMovementRange: 100,
+    ovalHeightOffset: 0,
+    ovalWidthRatio: 1,
+    ovalSecondaryColor: '#00ff00',
+    ovalRotationSpeed: 0.2,
+    ovalRotationOffset: 0,
+    
     // Bass filter settings
     bassFrequency: 150,
     bassQuality: 1
@@ -74,7 +86,9 @@ export const presets = {
         horizontalLineSpacing: 100,
         waveAmplitude: 30,
         waveSpeed: 1,
-        verticalMovement: 'none'
+        verticalMovement: 'none',
+        ovalCount: 1,
+        ovalSize: 30,
     },
     maximal: {
         patternMode: 'radial',
@@ -95,7 +109,9 @@ export const presets = {
         horizontalLineSpacing: 80,
         waveAmplitude: 100,
         waveSpeed: 3,
-        verticalMovement: 'updown'
+        verticalMovement: 'updown',
+        ovalCount: 4,
+        ovalSize: 80,
     },
     neon: {
         patternMode: 'radial',
@@ -116,7 +132,15 @@ export const presets = {
         horizontalLineSpacing: 90,
         waveAmplitude: 80,
         waveSpeed: 2,
-        verticalMovement: 'wave'
+        verticalMovement: 'wave',
+        ovalCount: 3,
+        ovalSize: 60,
+        ovalStyle: 'double',
+        ovalMovementSpeed: 2,
+        ovalMovementRange: 120,
+        ovalHeightOffset: -30,
+        ovalWidthRatio: 2.5,
+        ovalSecondaryColor: '#ff00ff',
     },
     matrix: {
         patternMode: 'horizontal',
@@ -137,7 +161,9 @@ export const presets = {
         horizontalLineSpacing: 60,
         waveAmplitude: 40,
         waveSpeed: 1,
-        verticalMovement: 'down'
+        verticalMovement: 'down',
+        ovalCount: 2,
+        ovalSize: 40,
     },
     sunset: {
         patternMode: 'horizontal',
@@ -158,7 +184,9 @@ export const presets = {
         horizontalLineSpacing: 120,
         waveAmplitude: 90,
         waveSpeed: 1,
-        verticalMovement: 'wave'
+        verticalMovement: 'wave',
+        ovalCount: 2,
+        ovalSize: 40,
     },
     ocean: {
         patternMode: 'horizontal',
@@ -179,7 +207,9 @@ export const presets = {
         horizontalLineSpacing: 150,
         waveAmplitude: 120,
         waveSpeed: 1.5,
-        verticalMovement: 'wave'
+        verticalMovement: 'wave',
+        ovalCount: 2,
+        ovalSize: 40,
     },
     fire: {
         patternMode: 'radial',
@@ -200,7 +230,9 @@ export const presets = {
         horizontalLineSpacing: 70,
         waveAmplitude: 60,
         waveSpeed: 4,
-        verticalMovement: 'up'
+        verticalMovement: 'up',
+        ovalCount: 2,
+        ovalSize: 40,
     },
     rainbow: {
         patternMode: 'radial',
@@ -221,7 +253,9 @@ export const presets = {
         horizontalLineSpacing: 100,
         waveAmplitude: 70,
         waveSpeed: 2,
-        verticalMovement: 'none'
+        verticalMovement: 'none',
+        ovalCount: 2,
+        ovalSize: 40,
     },
     cosmic: {
         patternMode: 'radial',
@@ -242,7 +276,15 @@ export const presets = {
         horizontalLineSpacing: 110,
         waveAmplitude: 85,
         waveSpeed: 2.5,
-        verticalMovement: 'wave'
+        verticalMovement: 'wave',
+        ovalCount: 4,
+        ovalSize: 70,
+        ovalStyle: 'wave',
+        ovalMovementSpeed: 3,
+        ovalMovementRange: 150,
+        ovalHeightOffset: 0,
+        ovalWidthRatio: 1,
+        ovalSecondaryColor: '#ff00ff',
     },
     retro: {
         patternMode: 'horizontal',
@@ -263,7 +305,9 @@ export const presets = {
         horizontalLineSpacing: 80,
         waveAmplitude: 50,
         waveSpeed: 3,
-        verticalMovement: 'up'
+        verticalMovement: 'up',
+        ovalCount: 2,
+        ovalSize: 40,
     },
     zen: {
         patternMode: 'radial',
@@ -284,7 +328,9 @@ export const presets = {
         horizontalLineSpacing: 140,
         waveAmplitude: 40,
         waveSpeed: 1,
-        verticalMovement: 'none'
+        verticalMovement: 'none',
+        ovalCount: 2,
+        ovalSize: 40,
     }
 };
 
@@ -378,6 +424,8 @@ export function randomizeSettings() {
         verticalSpeed: random(0.5, 3, true),
         verticalRange: random(100, 300),
         bassFrequency: random(100, 200),
-        bassQuality: random(0.5, 2)
+        bassQuality: random(0.5, 2),
+        ovalCount: random(1, 5),
+        ovalSize: random(30, 100),
     };
 }
