@@ -11,37 +11,59 @@ export class SettingsManager {
     constructor() {
         this.settings = loadSettings();
         this.setupEventListeners();
-        this.updateUIFromSettings();
         this.autoShuffleInterval = null;
         this.countdownInterval = null;
         this.lastShuffleTime = Date.now();
-        this.beatCount = 0; // Add beat count tracking
+        this.beatCount = 0;
+        this.countdowns = {
+            time: { element: null, remaining: 30 },
+            beats: { element: null, remaining: 120 }
+        };
         
-        // Only initialize settings UI if we're on the settings page
+        // Initialize countdown elements regardless of page
+        this.countdowns.time.element = document.getElementById('timeCountdown');
+        this.countdowns.beats.element = document.getElementById('beatCountdown');
+        
+        // Start countdown updates if elements exist
+        if (this.countdowns.time.element || this.countdowns.beats.element) {
+            this.startCountdownUpdates();
+        }
+        
+        // Initialize auto-shuffle if enabled
+        if (this.settings.autoShuffle) {
+            this.startAutoShuffle();
+        }
+        
+        // Additional settings page initialization
         if (window.location.pathname === '/settings') {
             this.updateUIFromSettings();
             this.populatePresetList();
             this.saveHandler = () => this.saveNewPreset();
-            
-            // Initialize auto-shuffle if enabled
-            if (this.settings.autoShuffle) {
-                this.startAutoShuffle();
-            }
-            
-            // Start countdown updates
-            this.startCountdownUpdates();
         }
     }
 
-    // Add method to update beat count
-    updateBeatCount(count) {
-        this.beatCount = count;
-        if (this.settings.beatAutoShuffle) {
-            const beatElement = document.getElementById('beatCountdown');
-            if (beatElement) {
-                const remaining = Math.max(0, 120 - this.beatCount);
-                beatElement.textContent = `(${remaining})`;
+    updateCountdowns() {
+        // Update time-based countdown
+        if (this.settings.autoShuffle) {
+            const elapsed = Date.now() - this.lastShuffleTime;
+            this.countdowns.time.remaining = Math.max(0, 30 - Math.floor(elapsed / 1000));
+            if (this.countdowns.time.element) {
+                this.countdowns.time.element.textContent = this.countdowns.time.remaining > 0 ? 
+                    `(${this.countdowns.time.remaining}s)` : '';
             }
+        } else if (this.countdowns.time.element) {
+            this.countdowns.time.element.textContent = '';
+        }
+
+        // Update beat-based countdown
+        if (this.settings.beatAutoShuffle) {
+            this.countdowns.beats.remaining = Math.max(0, 240 - this.beatCount);
+            if (this.countdowns.beats.element && window.location.pathname === '/settings') {
+                this.countdowns.beats.element.textContent = this.countdowns.beats.remaining > 0 ? 
+                    `(${this.countdowns.beats.remaining})` : '';
+            }
+        } else if (this.countdowns.beats.element) {
+            this.countdowns.beats.element.textContent = '';
         }
     }
 
@@ -50,17 +72,26 @@ export class SettingsManager {
             clearInterval(this.countdownInterval);
         }
         
-        this.countdownInterval = setInterval(() => {
-            // Update time-based countdown
-            if (this.settings.autoShuffle) {
-                const timeElement = document.getElementById('timeCountdown');
-                if (timeElement) {
-                    const elapsed = Date.now() - this.lastShuffleTime;
-                    const remaining = Math.max(0, 30 - Math.floor(elapsed / 1000));
-                    timeElement.textContent = `(${remaining}s)`;
-                }
+        // Update countdowns every second
+        this.countdownInterval = setInterval(() => this.updateCountdowns(), 1000);
+    }
+
+    // Update the beat count method to use the new countdown system
+    updateBeatCount(count) {
+        console.log('Beat detected! Current count:', count);
+        this.beatCount = count;
+        if (this.settings.beatAutoShuffle) {
+            this.updateCountdowns();
+            
+            // Check if we've reached 240 beats
+            if (this.beatCount >= 240) {
+                console.log('Reached 240 beats, randomizing settings...');
+                this.settings = randomizeSettings();
+                this.updateUIFromSettings();
+                this.beatCount = 0; // Reset beat count
+                this.updateCountdowns();
             }
-        }, 1000); // Update every second
+        }
     }
 
     startAutoShuffle() {
@@ -72,7 +103,8 @@ export class SettingsManager {
             this.settings = randomizeSettings();
             this.updateUIFromSettings();
             this.lastShuffleTime = Date.now();
-        }, 30000); // 30 seconds
+            this.updateCountdowns();
+        }, 30000);
     }
 
     stopAutoShuffle() {
@@ -80,11 +112,7 @@ export class SettingsManager {
             clearInterval(this.autoShuffleInterval);
             this.autoShuffleInterval = null;
         }
-        // Clear the countdown display
-        const timeElement = document.getElementById('timeCountdown');
-        if (timeElement) {
-            timeElement.textContent = '';
-        }
+        this.updateCountdowns();
     }
 
     setupEventListeners() {
@@ -291,16 +319,10 @@ export class SettingsManager {
         if (beatAutoShuffleCheckbox) {
             beatAutoShuffleCheckbox.addEventListener('change', (e) => {
                 this.settings.beatAutoShuffle = e.target.checked;
-                if (e.target.checked) {
-                    // Reset beat count when enabling
-                    this.beatCount = 0;
-                }
-                // Clear the countdown display if disabled
                 if (!e.target.checked) {
-                    const beatElement = document.getElementById('beatCountdown');
-                    if (beatElement) {
-                        beatElement.textContent = '';
-                    }
+                    // Only reset count when disabling
+                    this.beatCount = 0;
+                    this.updateCountdowns();
                 }
                 this.saveSettings();
             });
@@ -345,10 +367,7 @@ export class SettingsManager {
         if (autoShuffleCheckbox) {
             autoShuffleCheckbox.checked = this.settings.autoShuffle;
             if (!this.settings.autoShuffle) {
-                const timeElement = document.getElementById('timeCountdown');
-                if (timeElement) {
-                    timeElement.textContent = '';
-                }
+                this.updateCountdowns();
             }
         }
 
@@ -361,10 +380,7 @@ export class SettingsManager {
         if (beatAutoShuffleCheckbox) {
             beatAutoShuffleCheckbox.checked = this.settings.beatAutoShuffle;
             if (!this.settings.beatAutoShuffle) {
-                const beatElement = document.getElementById('beatCountdown');
-                if (beatElement) {
-                    beatElement.textContent = '';
-                }
+                this.updateCountdowns();
             }
         }
 
@@ -446,6 +462,17 @@ export class SettingsManager {
 
     saveSettings() {
         saveSettings(this.settings);
+    }
+
+    // Add method to refresh countdown elements (useful when DOM changes)
+    refreshCountdownElements() {
+        this.countdowns.time.element = document.getElementById('timeCountdown');
+        this.countdowns.beats.element = document.getElementById('beatCountdown');
+        
+        // Start countdown updates if not already running and elements exist
+        if ((this.countdowns.time.element || this.countdowns.beats.element) && !this.countdownInterval) {
+            this.startCountdownUpdates();
+        }
     }
 }
 

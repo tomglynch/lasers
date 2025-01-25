@@ -46,7 +46,8 @@ export class AudioVisualizer {
         this.noiseState = {
             quietStartTime: null,
             readyToShuffle: false,
-            lastShuffleTime: 0
+            lastShuffleTime: 0,
+            energyHistory: null
         };
         
         // Visual effects state
@@ -117,6 +118,7 @@ export class AudioVisualizer {
         
         // Handle beat counting and beat-based auto-shuffle
         if (beat) {
+            console.log("Beat detected in visualizer, current count:", this.beatDetectionData.beatCount);
             this.beatDetectionData.beatCount++;
             
             // Update settings manager with new beat count
@@ -124,7 +126,8 @@ export class AudioVisualizer {
                 window.settingsManager.updateBeatCount(this.beatDetectionData.beatCount);
             }
             
-            if (this.settings.beatAutoShuffle && this.beatDetectionData.beatCount >= 120) {
+            if (this.settings.beatAutoShuffle && this.beatDetectionData.beatCount >= 240) {
+                console.log("Reached 240 beats, randomizing settings...");
                 this.settings = randomizeSettings();
                 this.beatDetectionData.beatCount = 0;
                 
@@ -148,21 +151,37 @@ export class AudioVisualizer {
             const now = performance.now();
             const minShuffleInterval = 5000; // Minimum 5 seconds between shuffles
             
-            if (currentEnergy < this.settings.noiseThreshold) {
-                // Start or continue quiet period
+            // Keep a short history of energy levels to detect relative changes
+            if (!this.noiseState.energyHistory) {
+                this.noiseState.energyHistory = new Array(30).fill(currentEnergy); // About 0.5 seconds of history
+            }
+            
+            // Update energy history
+            this.noiseState.energyHistory.push(currentEnergy);
+            this.noiseState.energyHistory.shift();
+            
+            // Calculate average energy over the last ~0.5 seconds
+            const avgEnergy = this.noiseState.energyHistory.reduce((a, b) => a + b) / this.noiseState.energyHistory.length;
+            
+            // Detect when energy drops significantly below average
+            if (currentEnergy < avgEnergy * 0.7) { // Energy is 30% below average
                 if (!this.noiseState.quietStartTime) {
+                    console.log("Detected quieter section, current energy:", currentEnergy, "avg:", avgEnergy);
                     this.noiseState.quietStartTime = now;
                 }
                 
-                // Check if we've been quiet long enough
+                // After a short period in the quieter section, get ready to shuffle
+                const quietDuration = now - this.noiseState.quietStartTime;
                 if (!this.noiseState.readyToShuffle && 
-                    now - this.noiseState.quietStartTime > this.settings.noiseQuietDuration) {
+                    quietDuration > 1000) { // Wait 1 second in quieter section
+                    console.log("Ready to shuffle when volume increases");
                     this.noiseState.readyToShuffle = true;
                 }
-            } else if (currentEnergy > this.settings.noiseThreshold * 3 && // Require significant noise
+            } else if (currentEnergy > avgEnergy * 1.3 && // Energy is 30% above average
                       this.noiseState.readyToShuffle && 
                       now - this.noiseState.lastShuffleTime > minShuffleInterval) {
-                // Shuffle if we're ready and there's enough noise
+                // Shuffle when we detect a volume increase
+                console.log("Volume increased, shuffling! Current energy:", currentEnergy, "avg:", avgEnergy);
                 this.settings = randomizeSettings();
                 this.noiseState.readyToShuffle = false;
                 this.noiseState.lastShuffleTime = now;
@@ -172,9 +191,6 @@ export class AudioVisualizer {
                 if (window.location.pathname === '/settings') {
                     this.updateUIFromSettings();
                 }
-            } else if (currentEnergy >= this.settings.noiseThreshold) {
-                // Reset quiet period if noise exceeds threshold
-                this.noiseState.quietStartTime = null;
             }
         }
         

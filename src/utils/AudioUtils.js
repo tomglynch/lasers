@@ -55,6 +55,7 @@ export function detectBeat(audioData, beatData, settings) {
     // Add minimum energy threshold to filter out silence
     const MIN_ENERGY = 0.15;
     if (energy < MIN_ENERGY) {
+        // console.log("Beat rejected: energy below minimum threshold", {energy, minThreshold: MIN_ENERGY});
         return false;
     }
 
@@ -62,6 +63,7 @@ export function detectBeat(audioData, beatData, settings) {
     // (150ms is slightly less than the gap between the two fast ones in a dnb song)
     const now = Date.now();
     if (now - beatData.lastBeatTime < 150) {
+        // console.log("Beat rejected: too soon since last beat", {timeSinceLastBeat: now - beatData.lastBeatTime});
         return false;
     }
     
@@ -87,8 +89,16 @@ export function detectBeat(audioData, beatData, settings) {
         energy > beatData.energy.previous) {
         beatData.lastBeatTime = now;
         beatData.energy.previous = energy;
+        console.log("Beat detected!", {energy, threshold: beatData.threshold, timeSinceLastBeat: now - beatData.lastBeatTime});
         return true;
     }
+    
+    // console.log("Beat rejected: energy not high enough or not increasing", {
+    //     energy,
+    //     threshold: beatData.threshold,
+    //     previousEnergy: beatData.energy.previous,
+    //     timeSinceLastBeat: now - beatData.lastBeatTime
+    // });
     
     beatData.energy.previous = energy;
     return false;
