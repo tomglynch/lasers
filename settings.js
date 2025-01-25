@@ -7,7 +7,7 @@ import {
     randomizeSettings
 } from './src/Settings.js';
 
-class SettingsManager {
+export class SettingsManager {
     constructor() {
         this.settings = loadSettings();
         this.setupEventListeners();

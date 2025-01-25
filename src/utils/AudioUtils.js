@@ -15,11 +15,17 @@ export async function initializeAudio(stream, settings) {
     // Create a low-pass filter for bass frequencies
     const bassFilter = audioContext.createBiquadFilter();
     bassFilter.type = 'lowpass';
+    // Set the cutoff frequency (Hz) for the low-pass filter - determines which frequencies pass through
     bassFilter.frequency.value = settings.bassFrequency;
+    // Set the Q factor (resonance/width) of the filter - higher values create a narrower, more resonant peak
     bassFilter.Q.value = settings.bassQuality;
     
     const analyser = audioContext.createAnalyser();
     analyser.fftSize = 2048;
+    // Controls how much the analyzer smooths out changes between audio frames
+    // 0 = no smoothing (very jittery)
+    // 1 = maximum smoothing (very sluggish)
+    // 0.5 provides a balanced response for visualizations
     analyser.smoothingTimeConstant = 0.5;
     
     // Connect the audio nodes
@@ -56,7 +62,6 @@ export function detectBeat(audioData, beatData, settings) {
     // (150ms is slightly less than the gap between the two fast ones in a dnb song)
     const now = Date.now();
     if (now - beatData.lastBeatTime < 150) {
-        console.log("Beat rejected: beat too recent");
         return false;
     }
     
@@ -78,19 +83,11 @@ export function detectBeat(audioData, beatData, settings) {
     );
     
     // Detect beat with less strict conditions
-    // Removed the 1.3 * avg condition since the average was making it harder over time
     if (energy > beatData.threshold && 
         energy > beatData.energy.previous) {
         beatData.lastBeatTime = now;
         beatData.energy.previous = energy;
-        console.log("Beat detected", {energy, threshold: beatData.threshold, avg});
         return true;
-    } else {
-        if (energy <= beatData.threshold) {
-            console.log("Beat rejected: energy below threshold", {energy, threshold: beatData.threshold});
-        } else if (energy <= beatData.energy.previous) {
-            console.log("Beat rejected: energy not increasing", {energy, previous: beatData.energy.previous});
-        }
     }
     
     beatData.energy.previous = energy;

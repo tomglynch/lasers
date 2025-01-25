@@ -29,10 +29,10 @@ export function drawOvals(ctx, dimensions, audioData, settings, beat) {
         performance.now() / 1000 * speed; // Wave movement
     
     // Number of ovals to draw
-    const numOvals = Math.max(1, Math.min(4, settings.ovalCount || 1));
+    const numOvals = Math.max(1, Math.min(8, settings.ovalCount || 1));
     const isDouble = style === 'double';
     const isV2 = style === 'ovalsv2';
-    const actualOvals = isV2 ? 2 : (isDouble ? Math.ceil(numOvals / 2) : numOvals);
+    const actualOvals = isV2 ? numOvals : (isDouble ? Math.ceil(numOvals / 2) : numOvals);
     
     // Base oval size
     const baseSize = Math.max(1, settings.ovalSize || 50);
@@ -127,8 +127,8 @@ export function drawOvals(ctx, dimensions, audioData, settings, beat) {
     
     // Draw all ovals
     if (isV2) {
-        // Draw two pairs of ovals with fixed colors
-        for (let pair = 0; pair < 2; pair++) {
+        // Draw pairs of ovals with fixed colors
+        for (let pair = 0; pair < actualOvals; pair++) {
             // Draw purple oval first (behind)
             drawSingleOval(pair, v2Colors[1], 0, pair);
             // Draw turquoise oval second (in front)
