@@ -1,6 +1,7 @@
 import express from 'express';
 import livereload from 'livereload';
 import connectLivereload from 'connect-livereload';
+import path from 'path';
 
 const app = express();
 const port = 8000;
@@ -18,6 +19,11 @@ liveReloadServer.watch(process.cwd());
 
 // Add livereload middleware to express BEFORE static middleware
 app.use(connectLivereload());
+
+// Add route for settings page
+app.get('/settings', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'settings.html'));
+});
 
 // Serve static files with correct MIME types
 app.use(express.static('./', {

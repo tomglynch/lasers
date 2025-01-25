@@ -16,8 +16,8 @@
         #canvas {
             display: block;
         }
-        
-        #settings {
+
+        #controls {
             position: fixed;
             top: 20px;
             left: 20px;
@@ -26,86 +26,10 @@
             padding: 20px;
             border-radius: 15px;
             border: 1px solid #444;
-            max-height: 90vh;
-            overflow-y: auto;
             font-family: 'Arial', sans-serif;
-            width: 300px;
         }
-        
-        #settings.hidden {
-            display: none;
-        }
-        
-        button, input {
-            margin: 5px;
-            padding: 5px;
-        }
-        
-        .preset-controls {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #444;
-        }
-        
-        .preset-controls select,
-        .preset-controls input[type="text"] {
-            width: 150px;
-            margin-bottom: 5px;
-        }
-        
-        #horizontalControls {
-            display: none;
-        }
-        
-        #horizontalControls.visible {
-            display: block;
-        }
-        
-        #cycleControls {
-            display: none;
-        }
-        
-        #cycleControls.visible {
-            display: block;
-        }
-        
-        .settings-section {
-            border-bottom: 1px solid #444;
-            padding: 10px 0;
-            margin-bottom: 10px;
-        }
-        
-        .settings-section h4 {
-            margin: 0 0 10px 0;
-            color: #888;
-            text-transform: uppercase;
-            font-size: 0.9em;
-        }
-        
-        .control-group {
-            margin-bottom: 8px;
-        }
-        
-        label {
-            display: block;
-            margin: 5px 0;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            margin: 5px 0;
-        }
-        
-        select {
-            width: 100%;
-            padding: 5px;
-            background: #333;
-            color: white;
-            border: 1px solid #555;
-            border-radius: 4px;
-        }
-        
-        button {
+
+        #controls button {
             background: #444;
             color: white;
             border: none;
@@ -113,364 +37,56 @@
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.3s;
+            margin: 0 5px;
         }
-        
-        button:hover {
+
+        #controls button:hover {
             background: #555;
         }
-        
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+
+        #settings-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 15px;
+            border: 1px solid #444;
+            text-decoration: none;
+            font-family: 'Arial', sans-serif;
+            transition: background 0.3s;
+        }
+
+        #settings-link:hover {
+            background: rgba(40, 40, 40, 0.9);
+        }
+
+        /* Hide controls when in fullscreen */
+        :fullscreen #controls {
+            display: none;
         }
         
-        input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
+        :-webkit-full-screen #controls {
+            display: none;
         }
         
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        :-moz-full-screen #controls {
+            display: none;
         }
         
-        .min-value, .max-value, .current-value {
-            width: 30px;
-            text-align: center;
-        }
-        
-        #ovalControls .rotation-control {
-            transition: opacity 0.3s;
-        }
-        
-        #ovalControls.ovalsv2 .rotation-control {
+        :-ms-fullscreen #controls {
             display: none;
         }
     </style>
 </head>
 <body>
     <canvas id="canvas"></canvas>
-    <div id="settings">
-        <div class="settings-section">
-            <h4>Main Controls</h4>
-            <button id="startAudio">Start Audio</button>
-            <button id="fullscreenBtn">Fullscreen</button>
-            <button id="randomizeBtn">Randomize!</button>
-        </div>
-
-        <div class="settings-section">
-            <h4>Pattern</h4>
-            <select id="patternMode">
-                <option value="radial">Radial</option>
-                <option value="horizontal">Horizontal</option>
-                <option value="oval">Oval</option>
-            </select>
-        </div>
-
-        <div class="settings-section">
-            <h4>Line Settings</h4>
-            <label>Line Count:
-                <div class="slider-container">
-                    <span class="min-value">1</span>
-                    <input type="range" id="lineCount" min="1" max="20" value="8">
-                    <span class="max-value">20</span>
-                    <span class="current-value">8</span>
-                </div>
-            </label>
-            <label>Line Thickness:
-                <div class="slider-container">
-                    <span class="min-value">1</span>
-                    <input type="range" id="lineThickness" min="1" max="10" value="2">
-                    <span class="max-value">10</span>
-                    <span class="current-value">2</span>
-                </div>
-            </label>
-            <label>Sensitivity:
-                <div class="slider-container">
-                    <span class="min-value">1</span>
-                    <input type="range" id="sensitivity" min="1" max="100" value="50">
-                    <span class="max-value">100</span>
-                    <span class="current-value">50</span>
-                </div>
-            </label>
-        </div>
-
-        <div class="settings-section">
-            <h4>Color</h4>
-            <div class="control-group">
-                <label>Color Mode:
-                    <select id="colorMode">
-                        <option value="static">Static</option>
-                        <option value="cycle">Color Cycle</option>
-                    </select>
-                </label>
-            </div>
-            <div class="control-group">
-                <label>Line Color:
-                    <input type="color" id="colorPicker" value="#ff0000">
-                </label>
-            </div>
-            <div id="cycleControls">
-                <label>Cycle Speed:
-                    <div class="slider-container">
-                        <span class="min-value">0.1</span>
-                        <input type="range" id="colorCycleSpeed" min="0.1" max="10" step="0.1" value="2">
-                        <span class="max-value">10</span>
-                        <span class="current-value">2</span>
-                    </div>
-                </label>
-                <label>Saturation:
-                    <div class="slider-container">
-                        <span class="min-value">0</span>
-                        <input type="range" id="colorSaturation" min="0" max="100" value="100">
-                        <span class="max-value">100</span>
-                        <span class="current-value">100</span>
-                    </div>
-                </label>
-                <label>Lightness:
-                    <div class="slider-container">
-                        <span class="min-value">0</span>
-                        <input type="range" id="colorLightness" min="0" max="100" value="50">
-                        <span class="max-value">100</span>
-                        <span class="current-value">50</span>
-                    </div>
-                </label>
-            </div>
-        </div>
-
-        <div class="settings-section">
-            <h4>Beat Detection</h4>
-            <label>Bass Frequency:
-                <div class="slider-container">
-                    <span class="min-value">20</span>
-                    <input type="range" id="bassFrequency" min="20" max="400" value="150">
-                    <span class="max-value">400</span>
-                    <span class="current-value">150</span>
-                </div>
-            </label>
-            <label>Bass Quality (Q):
-                <div class="slider-container">
-                    <span class="min-value">0.1</span>
-                    <input type="range" id="bassQuality" min="0.1" max="5" step="0.1" value="1">
-                    <span class="max-value">5</span>
-                    <span class="current-value">1</span>
-                </div>
-            </label>
-            <label>Beat Sensitivity:
-                <div class="slider-container">
-                    <span class="min-value">0.1</span>
-                    <input type="range" id="beatSensitivity" min="0.1" max="0.5" step="0.05" value="0.3">
-                    <span class="max-value">0.5</span>
-                    <span class="current-value">0.3</span>
-                </div>
-            </label>
-            <label>Beat Intensity:
-                <div class="slider-container">
-                    <span class="min-value">1</span>
-                    <input type="range" id="beatIntensity" min="1" max="3" step="0.1" value="1.5">
-                    <span class="max-value">3</span>
-                    <span class="current-value">1.5</span>
-                </div>
-            </label>
-            <label>Beat Decay:
-                <div class="slider-container">
-                    <span class="min-value">0.9</span>
-                    <input type="range" id="beatDecay" min="0.9" max="0.99" step="0.01" value="0.98">
-                    <span class="max-value">0.99</span>
-                    <span class="current-value">0.98</span>
-                </div>
-            </label>
-        </div>
-
-        <div class="settings-section">
-            <h4>Visual Effects</h4>
-            <label class="checkbox-label">
-                <input type="checkbox" id="particlesEffect" checked>
-                Enable Particles
-            </label>
-            <label>Particle Size:
-                <div class="slider-container">
-                    <span class="min-value">1</span>
-                    <input type="range" id="particleSize" min="1" max="10" value="3">
-                    <span class="max-value">10</span>
-                    <span class="current-value">3</span>
-                </div>
-            </label>
-            <label class="checkbox-label">
-                <input type="checkbox" id="wavesEffect" checked>
-                Enable Waves
-            </label>
-            <label class="checkbox-label">
-                <input type="checkbox" id="frequencyBars">
-                Enable Frequency Bars
-            </label>
-        </div>
-
-        <div id="horizontalControls" class="settings-section">
-            <h4>Horizontal Pattern Settings</h4>
-            <label>Number of Lines:
-                <div class="slider-container">
-                    <span class="min-value">1</span>
-                    <input type="range" id="horizontalLineCount" min="1" max="10" value="3">
-                    <span class="max-value">10</span>
-                    <span class="current-value">3</span>
-                </div>
-            </label>
-            <label>Line Spacing:
-                <div class="slider-container">
-                    <span class="min-value">20</span>
-                    <input type="range" id="horizontalLineSpacing" min="20" max="200" value="100">
-                    <span class="max-value">200</span>
-                    <span class="current-value">100</span>
-                </div>
-            </label>
-            <label>Wave Amplitude:
-                <div class="slider-container">
-                    <span class="min-value">0</span>
-                    <input type="range" id="waveAmplitude" min="0" max="200" value="50">
-                    <span class="max-value">200</span>
-                    <span class="current-value">50</span>
-                </div>
-            </label>
-            <label>Wave Speed:
-                <div class="slider-container">
-                    <span class="min-value">0</span>
-                    <input type="range" id="waveSpeed" min="0" max="10" value="2" step="0.1">
-                    <span class="max-value">10</span>
-                    <span class="current-value">2</span>
-                </div>
-            </label>
-            <label>Vertical Movement:
-                <select id="verticalMovement">
-                    <option value="none">None</option>
-                    <option value="updown">Up & Down</option>
-                </select>
-            </label>
-            <label>Vertical Speed:
-                <div class="slider-container">
-                    <span class="min-value">0.1</span>
-                    <input type="range" id="verticalSpeed" min="0.1" max="5" step="0.1" value="1">
-                    <span class="max-value">5</span>
-                    <span class="current-value">1</span>
-                </div>
-            </label>
-            <label>Vertical Range:
-                <div class="slider-container">
-                    <span class="min-value">10</span>
-                    <input type="range" id="verticalRange" min="10" max="400" value="200">
-                    <span class="max-value">400</span>
-                    <span class="current-value">200</span>
-                </div>
-            </label>
-        </div>
-
-        <div id="ovalControls" class="settings-section">
-            <h4>Oval Pattern Settings</h4>
-            <label>Style:
-                <select id="ovalStyle">
-                    <option value="slow">Slow Float</option>
-                    <option value="wave">Wave Motion</option>
-                    <option value="double">Double Ovals</option>
-                    <option value="ovalsv2">Wide Pairs (No Rotation)</option>
-                </select>
-            </label>
-            <label>Number of Ovals:
-                <div class="slider-container">
-                    <span class="min-value">1</span>
-                    <input type="range" id="ovalCount" min="1" max="4" value="3">
-                    <span class="max-value">4</span>
-                    <span class="current-value">3</span>
-                </div>
-            </label>
-            <label>Oval Size:
-                <div class="slider-container">
-                    <span class="min-value">10</span>
-                    <input type="range" id="ovalSize" min="10" max="200" value="50">
-                    <span class="max-value">200</span>
-                    <span class="current-value">50</span>
-                </div>
-            </label>
-            <label>Movement Speed:
-                <div class="slider-container">
-                    <span class="min-value">0.5</span>
-                    <input type="range" id="ovalMovementSpeed" min="0.5" max="5" step="0.1" value="2">
-                    <span class="max-value">5</span>
-                    <span class="current-value">2</span>
-                </div>
-            </label>
-            <label>Movement Range:
-                <div class="slider-container">
-                    <span class="min-value">50</span>
-                    <input type="range" id="ovalMovementRange" min="50" max="400" value="100">
-                    <span class="max-value">400</span>
-                    <span class="current-value">100</span>
-                </div>
-            </label>
-            <label>Height Offset (%):
-                <div class="slider-container">
-                    <span class="min-value">-50</span>
-                    <input type="range" id="ovalHeightOffset" min="-50" max="50" value="0">
-                    <span class="max-value">50</span>
-                    <span class="current-value">0</span>
-                </div>
-            </label>
-            <label>Width Ratio:
-                <div class="slider-container">
-                    <span class="min-value">0.5</span>
-                    <input type="range" id="ovalWidthRatio" min="0.5" max="4" step="0.1" value="1">
-                    <span class="max-value">4</span>
-                    <span class="current-value">1</span>
-                </div>
-            </label>
-            <label class="rotation-control">Rotation Speed (rps):
-                <div class="slider-container">
-                    <span class="min-value">-2</span>
-                    <input type="range" id="ovalRotationSpeed" min="-2" max="2" step="0.1" value="0.2">
-                    <span class="max-value">2</span>
-                    <span class="current-value">0.2</span>
-                </div>
-            </label>
-            <label class="rotation-control">Rotation Offset:
-                <div class="slider-container">
-                    <span class="min-value">0°</span>
-                    <input type="range" id="ovalRotationOffset" min="0" max="360" value="0">
-                    <span class="max-value">360°</span>
-                    <span class="current-value">0°</span>
-                </div>
-            </label>
-            <label class="color-control">Secondary Color:
-                <input type="color" id="ovalSecondaryColor" value="#00ff00">
-            </label>
-        </div>
-
-        <div class="settings-section">
-            <h4>Presets</h4>
-            <select id="presetSelect">
-                <option value="default">Default</option>
-                <option value="minimal">Minimal</option>
-                <option value="maximal">Maximal</option>
-                <option value="neon">Neon Pulse</option>
-                <option value="matrix">Matrix</option>
-                <option value="sunset">Sunset Waves</option>
-                <option value="ocean">Ocean Deep</option>
-                <option value="fire">Fire Dance</option>
-                <option value="rainbow">Rainbow Flow</option>
-                <option value="cosmic">Cosmic Rays</option>
-                <option value="retro">Retro Wave</option>
-                <option value="zen">Zen Garden</option>
-            </select>
-            <button id="loadPreset">Load Preset</button>
-            <br>
-            <input type="text" id="newPresetName" placeholder="New preset name">
-            <button id="savePreset">Save Current as Preset</button>
-        </div>
-
-        <div class="settings-section">
-            <button id="toggleSettings">Hide Settings</button>
-        </div>
+    <div id="controls">
+        <button id="startAudio">Start Audio</button>
+        <button id="fullscreenBtn">Fullscreen</button>
     </div>
+    <!-- <a href="/settings" id="settings-link">Settings</a> -->
     <script type="module" src="app.js"></script>
 </body>
 </html> 

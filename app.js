@@ -1,52 +1,24 @@
 import { AudioVisualizer } from './src/AudioVisualizer.js';
+import { SettingsManager } from './settings.js';
 
-// Initialize on DOM content loaded
-window.addEventListener('DOMContentLoaded', () => {
-    // Verify all required elements exist
-    const requiredElements = [
-        'canvas',
-        'startAudio',
-        'fullscreenBtn',
-        'colorPicker',
-        'sensitivity',
-        'lineCount',
-        'toggleSettings',
-        'particlesEffect',
-        'particleSize',
-        'wavesEffect',
-        'frequencyBars',
-        'lineThickness',
-        'patternMode',
-        'horizontalControls',
-        'colorMode',
-        'cycleControls',
-        'colorCycleSpeed',
-        'colorSaturation',
-        'colorLightness',
-        'horizontalLineCount',
-        'horizontalLineSpacing',
-        'waveAmplitude',
-        'waveSpeed',
-        'verticalMovement',
-        'verticalSpeed',
-        'verticalRange',
-        'settings',
-        'presetSelect',
-        'loadPreset',
-        'newPresetName',
-        'savePreset',
-        'bassFrequency',
-        'bassQuality'
-    ];
+// Create instances
+const visualizer = new AudioVisualizer();
+const settingsManager = new SettingsManager();
 
-    const missingElements = requiredElements.filter(id => !document.getElementById(id));
-    
-    if (missingElements.length > 0) {
-        console.error('Missing HTML elements:', missingElements);
-        return;
+// Make settings manager globally available for the visualizer
+window.settingsManager = settingsManager;
+
+// Start audio if autoplay is enabled
+document.addEventListener('DOMContentLoaded', () => {
+    // Add click handler for start audio button
+    const startAudioBtn = document.getElementById('startAudio');
+    if (startAudioBtn) {
+        startAudioBtn.addEventListener('click', () => visualizer.startAudio());
     }
 
-    // Initialize visualizer
-    const visualizer = new AudioVisualizer();
-    setTimeout(() => visualizer.startAudio(), 100);
+    // Add click handler for fullscreen button
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => visualizer.toggleFullscreen());
+    }
 }); 

@@ -4,6 +4,8 @@
 
 import { generateRandomColor, hslToHex } from './utils/ColorUtils.js';
 
+const SETTINGS_KEY = 'visualizerSettings';
+
 /**
  * Default settings for the visualizer
  */
@@ -12,6 +14,13 @@ export const defaultSettings = {
     patternMode: 'radial',
     color: '#ff0000',
     colorMode: 'static',
+    
+    // Auto-shuffle
+    autoShuffle: false,
+    noiseAutoShuffle: false,
+    beatAutoShuffle: false,
+    noiseThreshold: 0.1, // Threshold for considering "low noise"
+    noiseQuietDuration: 3000, // Duration in ms of low noise needed before ready to shuffle
     
     // Beat detection
     beatSensitivity: 0.12,
@@ -28,7 +37,6 @@ export const defaultSettings = {
     particleCount: 50,
     particleSize: 3,
     wavesEnabled: true,
-    frequencyBarsEnabled: false,
     
     // Color cycling
     colorCycleSpeed: 2,
@@ -65,7 +73,7 @@ export const defaultSettings = {
 /**
  * Preset configurations
  */
-export const presets = {
+const presets = {
     default: { ...defaultSettings },
     minimal: {
         patternMode: 'horizontal',
@@ -335,97 +343,102 @@ export const presets = {
 };
 
 /**
- * Load settings from localStorage
- * @returns {Object} Loaded settings
+ * Load settings from localStorage or use defaults
  */
 export function loadSettings() {
-    const savedSettings = localStorage.getItem('audioVisualizerSettings');
-    const savedPresets = localStorage.getItem('audioVisualizerPresets');
-    
-    let settings = { ...defaultSettings };
-    
-    if (savedSettings) {
-        settings = { ...settings, ...JSON.parse(savedSettings) };
+    try {
+        const savedSettings = localStorage.getItem(SETTINGS_KEY);
+        if (savedSettings) {
+            return { ...defaultSettings, ...JSON.parse(savedSettings) };
+        }
+    } catch (e) {
+        console.error('Error loading settings:', e);
     }
-    
-    if (savedPresets) {
-        Object.assign(presets, JSON.parse(savedPresets));
-    }
-    
-    return settings;
+    return { ...defaultSettings };
 }
 
 /**
  * Save settings to localStorage
- * @param {Object} settings - Current settings
  */
 export function saveSettings(settings) {
-    localStorage.setItem('audioVisualizerSettings', JSON.stringify(settings));
-    localStorage.setItem('audioVisualizerPresets', JSON.stringify(presets));
+    try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        // Dispatch a custom event to notify other tabs
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: SETTINGS_KEY,
+            newValue: JSON.stringify(settings),
+            url: window.location.href
+        }));
+    } catch (e) {
+        console.error('Error saving settings:', e);
+    }
 }
 
 /**
  * Load a preset configuration
- * @param {string} presetName - Name of the preset to load
- * @returns {Object} Preset settings
  */
 export function loadPreset(presetName) {
-    return presets[presetName] ? { ...presets[presetName] } : { ...defaultSettings };
+    const preset = presets[presetName] || defaultSettings;
+    saveSettings(preset); // Save the preset so it's immediately available to other tabs
+    return { ...preset };
 }
 
 /**
- * Save current settings as a new preset
- * @param {string} presetName - Name for the new preset
- * @param {Object} settings - Current settings to save
+ * Save a new preset
  */
-export function savePreset(presetName, settings) {
-    presets[presetName] = { ...settings };
-    saveSettings(settings);
+export function savePreset(name, settings) {
+    try {
+        const savedPresets = JSON.parse(localStorage.getItem('presets') || '{}');
+        savedPresets[name] = settings;
+        localStorage.setItem('presets', JSON.stringify(savedPresets));
+    } catch (e) {
+        console.error('Error saving preset:', e);
+    }
 }
 
 /**
  * Generate random settings
- * @returns {Object} Randomized settings
  */
 export function randomizeSettings() {
-    const random = (min, max, decimal = false) => {
-        const val = Math.random() * (max - min) + min;
-        return decimal ? val : Math.floor(val);
-    };
+    const settings = { ...defaultSettings };
     
-    const randomBool = (probability = 0.5) => Math.random() < probability;
+    // Randomize core settings
+    settings.patternMode = Math.random() < 0.33 ? 'radial' : (Math.random() < 0.5 ? 'horizontal' : 'oval');
+    const randomColor = generateRandomColor();
+    settings.color = hslToHex(randomColor.hue, randomColor.saturation, randomColor.lightness);
+    settings.colorMode = Math.random() < 0.5 ? 'static' : 'cycle';
+    settings.colorHue = randomColor.hue;
+    settings.colorSaturation = randomColor.saturation;
+    settings.colorLightness = randomColor.lightness;
     
-    const color = generateRandomColor();
+    // Randomize visual settings within reasonable ranges
+    settings.sensitivity = Math.floor(Math.random() * 40) + 30; // 30-70
+    settings.lineCount = Math.floor(Math.random() * 13) + 3; // 3-16
+    settings.lineThickness = Math.floor(Math.random() * 2) + 1; // 1-3
     
-    return {
-        ...defaultSettings,
-        patternMode: randomBool() ? 'radial' : 'horizontal',
-        colorMode: randomBool() ? 'static' : 'cycle',
-        colorHue: color.hue,
-        colorSaturation: color.saturation,
-        colorLightness: color.lightness,
-        color: hslToHex(color.hue, color.saturation, color.lightness),
-        colorCycleSpeed: random(0.5, 5, true),
-        lineCount: random(3, 16),
-        lineThickness: random(1, 5),
-        sensitivity: random(30, 70),
-        particlesEnabled: randomBool(0.6),
-        particleSize: random(2, 6),
-        wavesEnabled: randomBool(0.6),
-        frequencyBarsEnabled: randomBool(0.3),
-        beatSensitivity: random(0.2, 0.4, true),
-        beatIntensity: random(1.2, 2.5, true),
-        beatDecay: random(0.95, 0.99, true),
-        horizontalLineCount: random(2, 8),
-        horizontalLineSpacing: random(50, 150),
-        waveAmplitude: random(30, 100),
-        waveSpeed: random(1, 4, true),
-        verticalMovement: randomBool(0.7) ? 'updown' : 'none',
-        verticalSpeed: random(0.5, 3, true),
-        verticalRange: random(100, 300),
-        bassFrequency: random(100, 200),
-        bassQuality: random(0.5, 2),
-        ovalCount: random(1, 5),
-        ovalSize: random(30, 100),
-    };
+    // Randomize visual effects
+    settings.particlesEnabled = Math.random() < 0.7; // 70% chance of being enabled
+    settings.particleSize = Math.floor(Math.random() * 6) + 2; // 2-8
+    settings.wavesEnabled = Math.random() < 0.7; // 70% chance of being enabled
+    
+    // Randomize oval settings
+    settings.ovalCount = Math.floor(Math.random() * 3) + 2; // 2-4
+    settings.ovalSize = Math.floor(Math.random() * 70) + 30; // 30-100
+    settings.ovalStyle = ['slow', 'wave', 'double', 'ovalsv2'][Math.floor(Math.random() * 4)];
+    settings.ovalMovementSpeed = Math.random() * 2.5 + 0.5; // 0.5-3.0
+    settings.ovalMovementRange = Math.floor(Math.random() * 100) + 50; // 50-150
+    settings.ovalHeightOffset = Math.floor(Math.random() * 60) - 30; // -30 to +30
+    settings.ovalWidthRatio = Math.random() * 3 + 1; // 1-4
+    settings.ovalRotationSpeed = (Math.random() * 2 - 1) * 2; // -2 to +2
+    settings.ovalRotationOffset = Math.random() * Math.PI * 2; // 0 to 2π
+    
+    // Generate a second random color for oval secondary color
+    const secondaryColor = generateRandomColor();
+    settings.ovalSecondaryColor = hslToHex(secondaryColor.hue, secondaryColor.saturation, secondaryColor.lightness);
+    
+    // Save the randomized settings
+    saveSettings(settings);
+    return settings;
 }
+
+export { presets };

@@ -38,7 +38,15 @@ export class AudioVisualizer {
                 history: new Array(8).fill(0.1)
             },
             threshold: 0.3,
-            lastBeatTime: 0
+            lastBeatTime: 0,
+            beatCount: 0
+        };
+        
+        // Noise auto-shuffle state
+        this.noiseState = {
+            quietStartTime: null,
+            readyToShuffle: false,
+            lastShuffleTime: 0
         };
         
         // Visual effects state
@@ -50,15 +58,16 @@ export class AudioVisualizer {
         
         this.setupCanvas();
         this.setupEventListeners();
-        this.updateUIFromSettings();
-        
-        // Populate preset list
-        this.populatePresetList();
+        this.setupStorageListener();
+
+        // Only initialize settings UI if we're on the settings page
+        if (window.location.pathname === '/settings') {
+            this.updateUIFromSettings();
+            this.populatePresetList();
+            this.saveHandler = () => this.saveNewPreset();
+        }
         
         this.audioStream = null;
-
-        // Define saveHandler as a class property
-        this.saveHandler = () => this.saveNewPreset();
     }
     
     setupCanvas() {
@@ -106,6 +115,69 @@ export class AudioVisualizer {
         this.analyser.getByteFrequencyData(this.dataArray);
         const beat = detectBeat(this.dataArray, this.beatDetectionData, this.settings);
         
+        // Handle beat counting and beat-based auto-shuffle
+        if (beat) {
+            this.beatDetectionData.beatCount++;
+            
+            // Update settings manager with new beat count
+            if (window.settingsManager) {
+                window.settingsManager.updateBeatCount(this.beatDetectionData.beatCount);
+            }
+            
+            if (this.settings.beatAutoShuffle && this.beatDetectionData.beatCount >= 120) {
+                this.settings = randomizeSettings();
+                this.beatDetectionData.beatCount = 0;
+                
+                // Update UI if on settings page
+                if (window.location.pathname === '/settings') {
+                    this.updateUIFromSettings();
+                }
+                
+                // Update settings manager with reset beat count
+                if (window.settingsManager) {
+                    window.settingsManager.updateBeatCount(0);
+                }
+            }
+        }
+        
+        // Calculate current energy level
+        const currentEnergy = this.dataArray.reduce((sum, value) => sum + value, 0) / this.dataArray.length / 255;
+        
+        // Handle noise-based auto-shuffle
+        if (this.settings.noiseAutoShuffle) {
+            const now = performance.now();
+            const minShuffleInterval = 5000; // Minimum 5 seconds between shuffles
+            
+            if (currentEnergy < this.settings.noiseThreshold) {
+                // Start or continue quiet period
+                if (!this.noiseState.quietStartTime) {
+                    this.noiseState.quietStartTime = now;
+                }
+                
+                // Check if we've been quiet long enough
+                if (!this.noiseState.readyToShuffle && 
+                    now - this.noiseState.quietStartTime > this.settings.noiseQuietDuration) {
+                    this.noiseState.readyToShuffle = true;
+                }
+            } else if (currentEnergy > this.settings.noiseThreshold * 3 && // Require significant noise
+                      this.noiseState.readyToShuffle && 
+                      now - this.noiseState.lastShuffleTime > minShuffleInterval) {
+                // Shuffle if we're ready and there's enough noise
+                this.settings = randomizeSettings();
+                this.noiseState.readyToShuffle = false;
+                this.noiseState.lastShuffleTime = now;
+                this.noiseState.quietStartTime = null;
+                
+                // Update UI if on settings page
+                if (window.location.pathname === '/settings') {
+                    this.updateUIFromSettings();
+                }
+            } else if (currentEnergy >= this.settings.noiseThreshold) {
+                // Reset quiet period if noise exceeds threshold
+                this.noiseState.quietStartTime = null;
+            }
+        }
+        
         // Update color if needed
         if (this.settings.colorMode === 'cycle') {
             this.settings.color = updateCycleColor(this.settings);
@@ -141,39 +213,14 @@ export class AudioVisualizer {
             this.particles = updateParticles(this.ctx, this.particles, this.settings);
         }
         
-        if (this.settings.frequencyBarsEnabled) {
-            drawFrequencyBars(this.ctx, dimensions, this.dataArray, this.settings);
-        }
+        // if (this.settings.frequencyBarsEnabled) {
+        //     drawFrequencyBars(this.ctx, dimensions, this.dataArray, this.settings);
+        // }
         
         requestAnimationFrame(this.animate);
     }
 
     setupEventListeners() {
-        // Helper function to update slider value display
-        const updateSliderValue = (slider) => {
-            const container = slider.closest('.slider-container');
-            if (container) {
-                const currentValue = container.querySelector('.current-value');
-                if (currentValue) {
-                    currentValue.textContent = slider.value;
-                }
-            }
-        };
-
-        // Helper function to add slider listener
-        const addSliderListener = (elementId, settingKey, parseFunc = parseInt) => {
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.addEventListener('input', (e) => {
-                    this.settings[settingKey] = parseFunc(e.target.value);
-                    updateSliderValue(e.target);
-                    this.saveSettings();
-                });
-                // Initialize value display
-                updateSliderValue(element);
-            }
-        };
-
         // Start audio button
         const startAudioBtn = document.getElementById('startAudio');
         if (startAudioBtn) {
@@ -191,292 +238,236 @@ export class AudioVisualizer {
                 }
             });
         }
+    }
 
-        // Settings toggle
-        const toggleSettings = document.getElementById('toggleSettings');
-        if (toggleSettings) {
-            toggleSettings.addEventListener('click', () => {
-                const settingsPanel = document.getElementById('settings');
-                if (settingsPanel) {
-                    settingsPanel.classList.toggle('visible');
-                }
-            });
-        }
-
-        // Color picker
-        const colorPicker = document.getElementById('colorPicker');
-        if (colorPicker) {
-            colorPicker.addEventListener('input', (e) => {
-                this.settings.color = e.target.value;
-                this.saveSettings();
-            });
-        }
-
-        // Add listeners for all sliders
-        addSliderListener('sensitivity', 'sensitivity');
-        addSliderListener('lineCount', 'lineCount');
-        addSliderListener('lineThickness', 'lineThickness');
-        addSliderListener('beatSensitivity', 'beatSensitivity', parseFloat);
-        addSliderListener('beatIntensity', 'beatIntensity', parseFloat);
-        addSliderListener('beatDecay', 'beatDecay', parseFloat);
-        addSliderListener('colorCycleSpeed', 'colorCycleSpeed', parseFloat);
-        addSliderListener('colorSaturation', 'colorSaturation');
-        addSliderListener('colorLightness', 'colorLightness');
-        addSliderListener('horizontalLineCount', 'horizontalLineCount');
-        addSliderListener('horizontalLineSpacing', 'horizontalLineSpacing');
-        addSliderListener('waveAmplitude', 'waveAmplitude');
-        addSliderListener('waveSpeed', 'waveSpeed', parseFloat);
-        addSliderListener('verticalSpeed', 'verticalSpeed', parseFloat);
-        addSliderListener('verticalRange', 'verticalRange');
-        addSliderListener('bassFrequency', 'bassFrequency');
-        addSliderListener('bassQuality', 'bassQuality', parseFloat);
-        addSliderListener('particleSize', 'particleSize');
-
-        // Pattern mode select
-        const patternMode = document.getElementById('patternMode');
-        if (patternMode) {
-            patternMode.addEventListener('change', (e) => {
-                this.settings.patternMode = e.target.value;
-                this.updateUIFromSettings();
-                this.saveSettings();
-            });
-        }
-
-        // Color mode select
-        const colorMode = document.getElementById('colorMode');
-        if (colorMode) {
-            colorMode.addEventListener('change', (e) => {
-                this.settings.colorMode = e.target.value;
-                this.updateUIFromSettings();
-                this.saveSettings();
-            });
-        }
-
-        // Vertical movement select
-        const verticalMovement = document.getElementById('verticalMovement');
-        if (verticalMovement) {
-            verticalMovement.addEventListener('change', (e) => {
-                this.settings.verticalMovement = e.target.value;
-                this.saveSettings();
-            });
-        }
-
-        // Effect checkboxes
-        const particlesEffect = document.getElementById('particlesEffect');
-        if (particlesEffect) {
-            particlesEffect.addEventListener('change', (e) => {
-                this.settings.particlesEnabled = e.target.checked;
-                this.saveSettings();
-            });
-        }
-
-        const wavesEffect = document.getElementById('wavesEffect');
-        if (wavesEffect) {
-            wavesEffect.addEventListener('change', (e) => {
-                this.settings.wavesEnabled = e.target.checked;
-                this.saveSettings();
-            });
-        }
-
-        const frequencyBars = document.getElementById('frequencyBars');
-        if (frequencyBars) {
-            frequencyBars.addEventListener('change', (e) => {
-                this.settings.frequencyBarsEnabled = e.target.checked;
-                this.saveSettings();
-            });
-        }
-
-        // Randomize button
-        const randomizeBtn = document.getElementById('randomizeBtn');
-        if (randomizeBtn) {
-            randomizeBtn.addEventListener('click', () => {
-                this.randomizeSettings();
-            });
-        }
-
-        // Save preset button
-        const savePresetBtn = document.getElementById('savePreset');
-        if (savePresetBtn) {
-            savePresetBtn.removeEventListener('click', this.saveHandler);
-            savePresetBtn.addEventListener('click', this.saveHandler, { once: true });
-        }
-
-        // Load preset button
-        const loadPresetBtn = document.getElementById('loadPreset');
-        if (loadPresetBtn) {
-            loadPresetBtn.addEventListener('click', () => {
-                this.loadSelectedPreset();
-            });
-        }
-
-        // Preset select
-        const presetSelect = document.getElementById('presetSelect');
-        if (presetSelect) {
-            presetSelect.addEventListener('change', () => {
-                this.loadSelectedPreset();
-            });
-        }
-
-        // Add listeners for oval pattern controls
-        addSliderListener('ovalCount', 'ovalCount');
-        addSliderListener('ovalSize', 'ovalSize');
-        addSliderListener('ovalMovementSpeed', 'ovalMovementSpeed');
-        addSliderListener('ovalMovementRange', 'ovalMovementRange');
-        addSliderListener('ovalHeightOffset', 'ovalHeightOffset');
-        addSliderListener('ovalWidthRatio', 'ovalWidthRatio', parseFloat);
-        addSliderListener('ovalRotationSpeed', 'ovalRotationSpeed', parseFloat);
-        
-        // Special handling for rotation offset to convert degrees to radians
-        const ovalRotationOffset = document.getElementById('ovalRotationOffset');
-        if (ovalRotationOffset) {
-            ovalRotationOffset.addEventListener('input', (e) => {
-                // Convert degrees to radians
-                this.settings.ovalRotationOffset = (parseFloat(e.target.value) * Math.PI) / 180;
-                const container = e.target.closest('.slider-container');
-                if (container) {
-                    const currentValue = container.querySelector('.current-value');
-                    if (currentValue) {
-                        currentValue.textContent = e.target.value + '°';
-                    }
-                }
-                this.saveSettings();
-            });
-        }
-
-        const ovalStyle = document.getElementById('ovalStyle');
-        if (ovalStyle) {
-            ovalStyle.addEventListener('change', (e) => {
-                this.settings.ovalStyle = e.target.value;
+    setupStorageListener() {
+        // Listen for settings changes from other tabs
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'visualizerSettings') {
+                this.settings = JSON.parse(e.newValue);
                 
-                // Update UI for ovalsv2 style
-                const ovalControls = document.getElementById('ovalControls');
-                if (ovalControls) {
-                    if (e.target.value === 'ovalsv2') {
-                        ovalControls.classList.add('ovalsv2');
-                    } else {
-                        ovalControls.classList.remove('ovalsv2');
-                    }
+                // Update UI if we're on the settings page
+                if (window.location.pathname === '/settings') {
+                    this.updateUIFromSettings();
                 }
-                
-                this.saveSettings();
-            });
-        }
 
-        // Update UI based on current style
-        const ovalControls = document.getElementById('ovalControls');
-        if (ovalControls && this.settings.ovalStyle === 'ovalsv2') {
-            ovalControls.classList.add('ovalsv2');
-        }
-
-        const ovalSecondaryColor = document.getElementById('ovalSecondaryColor');
-        if (ovalSecondaryColor) {
-            ovalSecondaryColor.addEventListener('input', (e) => {
-                this.settings.ovalSecondaryColor = e.target.value;
-                this.saveSettings();
-            });
-        }
+                // Update bass filter if it exists
+                this.updateBassFilter();
+            }
+        });
     }
 
     updateUIFromSettings() {
-        // Helper function to update slider value display
-        const updateSliderValue = (slider) => {
-            const container = slider.closest('.slider-container');
-            if (container) {
-                const currentValue = container.querySelector('.current-value');
-                if (currentValue) {
-                    currentValue.textContent = slider.value;
+        // Only update UI if we're on the settings page
+        if (window.location.pathname === '/settings') {
+            // Helper function to update slider value display
+            const updateSliderValue = (slider) => {
+                const container = slider.closest('.slider-container');
+                if (container) {
+                    const currentValue = container.querySelector('.current-value');
+                    if (currentValue) {
+                        currentValue.textContent = slider.value;
+                    }
                 }
-            }
-        };
+            };
 
-        // Update pattern mode visibility
-        const horizontalControls = document.getElementById('horizontalControls');
-        const ovalControls = document.getElementById('ovalControls');
-        
-        if (horizontalControls) {
-            horizontalControls.classList.toggle('visible', this.settings.patternMode === 'horizontal');
-        }
-        
-        if (ovalControls) {
-            ovalControls.classList.toggle('visible', this.settings.patternMode === 'oval');
-        }
-
-        // Update color mode visibility
-        const cycleControls = document.getElementById('cycleControls');
-        if (cycleControls) {
-            if (this.settings.colorMode === 'cycle') {
-                cycleControls.classList.add('visible');
-            } else {
-                cycleControls.classList.remove('visible');
-            }
-        }
-
-        // Update input values
-        const elements = {
-            'sensitivity': this.settings.sensitivity,
-            'lineCount': this.settings.lineCount,
-            'lineThickness': this.settings.lineThickness,
-            'beatSensitivity': this.settings.beatSensitivity,
-            'beatIntensity': this.settings.beatIntensity,
-            'beatDecay': this.settings.beatDecay,
-            'patternMode': this.settings.patternMode,
-            'colorMode': this.settings.colorMode,
-            'colorPicker': this.settings.color,
-            'horizontalLineCount': this.settings.horizontalLineCount,
-            'horizontalLineSpacing': this.settings.horizontalLineSpacing,
-            'waveAmplitude': this.settings.waveAmplitude,
-            'waveSpeed': this.settings.waveSpeed,
-            'verticalMovement': this.settings.verticalMovement,
-            'verticalSpeed': this.settings.verticalSpeed,
-            'verticalRange': this.settings.verticalRange,
-            'colorCycleSpeed': this.settings.colorCycleSpeed,
-            'colorSaturation': this.settings.colorSaturation,
-            'colorLightness': this.settings.colorLightness,
-            'bassFrequency': this.settings.bassFrequency,
-            'bassQuality': this.settings.bassQuality,
-            'particleSize': this.settings.particleSize
-        };
-
-        // Update checkbox states
-        const checkboxes = {
-            'particlesEffect': this.settings.particlesEnabled,
-            'wavesEffect': this.settings.wavesEnabled,
-            'frequencyBars': this.settings.frequencyBarsEnabled
-        };
-
-        // Update all input elements
-        for (const [id, value] of Object.entries(elements)) {
-            const element = document.getElementById(id);
-            if (element) {
-                if (element.type === 'range' || element.type === 'number') {
-                    element.value = value;
+            // Helper function to add slider listener
+            const addSliderListener = (elementId, settingKey, parseFunc = parseInt) => {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.addEventListener('input', (e) => {
+                        this.settings[settingKey] = parseFunc(e.target.value);
+                        updateSliderValue(e.target);
+                        this.saveSettings();
+                    });
+                    // Initialize value display
                     updateSliderValue(element);
-                } else if (element.type === 'color') {
-                    element.value = value;
-                } else if (element.tagName === 'SELECT') {
-                    element.value = value;
                 }
+            };
+
+            // Settings toggle
+            const toggleSettings = document.getElementById('toggleSettings');
+            if (toggleSettings) {
+                toggleSettings.addEventListener('click', () => {
+                    const settingsPanel = document.getElementById('settings');
+                    if (settingsPanel) {
+                        settingsPanel.classList.toggle('visible');
+                    }
+                });
             }
-        }
 
-        // Update all checkbox elements
-        for (const [id, value] of Object.entries(checkboxes)) {
-            const element = document.getElementById(id);
-            if (element && element.type === 'checkbox') {
-                element.checked = value;
+            // Color picker
+            const colorPicker = document.getElementById('colorPicker');
+            if (colorPicker) {
+                colorPicker.addEventListener('input', (e) => {
+                    this.settings.color = e.target.value;
+                    this.saveSettings();
+                });
             }
-        }
 
-        // Update oval style select
-        const ovalStyle = document.getElementById('ovalStyle');
-        if (ovalStyle) {
-            ovalStyle.value = this.settings.ovalStyle || 'slow';
-        }
+            // Add listeners for all sliders
+            addSliderListener('sensitivity', 'sensitivity');
+            addSliderListener('lineCount', 'lineCount');
+            addSliderListener('lineThickness', 'lineThickness');
+            addSliderListener('beatSensitivity', 'beatSensitivity', parseFloat);
+            addSliderListener('beatIntensity', 'beatIntensity', parseFloat);
+            addSliderListener('beatDecay', 'beatDecay', parseFloat);
+            addSliderListener('colorCycleSpeed', 'colorCycleSpeed', parseFloat);
+            addSliderListener('colorSaturation', 'colorSaturation');
+            addSliderListener('colorLightness', 'colorLightness');
+            addSliderListener('horizontalLineCount', 'horizontalLineCount');
+            addSliderListener('horizontalLineSpacing', 'horizontalLineSpacing');
+            addSliderListener('waveAmplitude', 'waveAmplitude');
+            addSliderListener('waveSpeed', 'waveSpeed', parseFloat);
+            addSliderListener('verticalSpeed', 'verticalSpeed', parseFloat);
+            addSliderListener('verticalRange', 'verticalRange');
+            addSliderListener('bassFrequency', 'bassFrequency');
+            addSliderListener('bassQuality', 'bassQuality', parseFloat);
+            addSliderListener('particleSize', 'particleSize');
 
-        // Update oval secondary color
-        const ovalSecondaryColor = document.getElementById('ovalSecondaryColor');
-        if (ovalSecondaryColor) {
-            ovalSecondaryColor.value = this.settings.ovalSecondaryColor || '#00ff00';
+            // Pattern mode select
+            const patternMode = document.getElementById('patternMode');
+            if (patternMode) {
+                patternMode.addEventListener('change', (e) => {
+                    this.settings.patternMode = e.target.value;
+                    this.updateUIFromSettings();
+                    this.saveSettings();
+                });
+            }
+
+            // Color mode select
+            const colorMode = document.getElementById('colorMode');
+            if (colorMode) {
+                colorMode.addEventListener('change', (e) => {
+                    this.settings.colorMode = e.target.value;
+                    this.updateUIFromSettings();
+                    this.saveSettings();
+                });
+            }
+
+            // Vertical movement select
+            const verticalMovement = document.getElementById('verticalMovement');
+            if (verticalMovement) {
+                verticalMovement.addEventListener('change', (e) => {
+                    this.settings.verticalMovement = e.target.value;
+                    this.saveSettings();
+                });
+            }
+
+            // Effect checkboxes
+            const particlesEffect = document.getElementById('particlesEffect');
+            if (particlesEffect) {
+                particlesEffect.addEventListener('change', (e) => {
+                    this.settings.particlesEnabled = e.target.checked;
+                    this.saveSettings();
+                });
+            }
+
+            const wavesEffect = document.getElementById('wavesEffect');
+            if (wavesEffect) {
+                wavesEffect.addEventListener('change', (e) => {
+                    this.settings.wavesEnabled = e.target.checked;
+                    this.saveSettings();
+                });
+            }
+
+            const frequencyBars = document.getElementById('frequencyBars');
+            if (frequencyBars) {
+                frequencyBars.addEventListener('change', (e) => {
+                    this.settings.frequencyBarsEnabled = e.target.checked;
+                    this.saveSettings();
+                });
+            }
+
+            // Randomize button
+            const randomizeBtn = document.getElementById('randomizeBtn');
+            if (randomizeBtn) {
+                randomizeBtn.addEventListener('click', () => {
+                    this.randomizeSettings();
+                });
+            }
+
+            // Save preset button
+            const savePresetBtn = document.getElementById('savePreset');
+            if (savePresetBtn) {
+                savePresetBtn.removeEventListener('click', this.saveHandler);
+                savePresetBtn.addEventListener('click', this.saveHandler, { once: true });
+            }
+
+            // Load preset button
+            const loadPresetBtn = document.getElementById('loadPreset');
+            if (loadPresetBtn) {
+                loadPresetBtn.addEventListener('click', () => {
+                    this.loadSelectedPreset();
+                });
+            }
+
+            // Preset select
+            const presetSelect = document.getElementById('presetSelect');
+            if (presetSelect) {
+                presetSelect.addEventListener('change', () => {
+                    this.loadSelectedPreset();
+                });
+            }
+
+            // Add listeners for oval pattern controls
+            addSliderListener('ovalCount', 'ovalCount');
+            addSliderListener('ovalSize', 'ovalSize');
+            addSliderListener('ovalMovementSpeed', 'ovalMovementSpeed');
+            addSliderListener('ovalMovementRange', 'ovalMovementRange');
+            addSliderListener('ovalHeightOffset', 'ovalHeightOffset');
+            addSliderListener('ovalWidthRatio', 'ovalWidthRatio', parseFloat);
+            addSliderListener('ovalRotationSpeed', 'ovalRotationSpeed', parseFloat);
+            
+            // Special handling for rotation offset to convert degrees to radians
+            const ovalRotationOffset = document.getElementById('ovalRotationOffset');
+            if (ovalRotationOffset) {
+                ovalRotationOffset.addEventListener('input', (e) => {
+                    // Convert degrees to radians
+                    this.settings.ovalRotationOffset = (parseFloat(e.target.value) * Math.PI) / 180;
+                    const container = e.target.closest('.slider-container');
+                    if (container) {
+                        const currentValue = container.querySelector('.current-value');
+                        if (currentValue) {
+                            currentValue.textContent = e.target.value + '°';
+                        }
+                    }
+                    this.saveSettings();
+                });
+            }
+
+            const ovalStyle = document.getElementById('ovalStyle');
+            if (ovalStyle) {
+                ovalStyle.addEventListener('change', (e) => {
+                    this.settings.ovalStyle = e.target.value;
+                    
+                    // Update UI for ovalsv2 style
+                    const ovalControls = document.getElementById('ovalControls');
+                    if (ovalControls) {
+                        if (e.target.value === 'ovalsv2') {
+                            ovalControls.classList.add('ovalsv2');
+                        } else {
+                            ovalControls.classList.remove('ovalsv2');
+                        }
+                    }
+                    
+                    this.saveSettings();
+                });
+            }
+
+            // Update UI based on current style
+            const ovalControls = document.getElementById('ovalControls');
+            if (ovalControls && this.settings.ovalStyle === 'ovalsv2') {
+                ovalControls.classList.add('ovalsv2');
+            }
+
+            const ovalSecondaryColor = document.getElementById('ovalSecondaryColor');
+            if (ovalSecondaryColor) {
+                ovalSecondaryColor.addEventListener('input', (e) => {
+                    this.settings.ovalSecondaryColor = e.target.value;
+                    this.saveSettings();
+                });
+            }
         }
     }
 
